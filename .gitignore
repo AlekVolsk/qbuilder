@@ -12,7 +12,7 @@ composer.lock
 
 # PHP
 *.log
+build-dev
+coverage
+coverage.xml
 .phpunit.result.cache
-
-# OS
-Thumbs.db
