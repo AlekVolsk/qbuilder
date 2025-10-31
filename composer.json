@@ -1,0 +1,41 @@
+{
+    "name": "ep-app/qbuilder",
+    "description": "SQL Query Builder with fluent interface supporting multiple database drivers (MySQL, PostgreSQL, SQLite, MSSQL, Oracle, ClickHouse)",
+    "type": "library",
+    "keywords": [
+        "sql",
+        "query-builder",
+        "database",
+        "mysql",
+        "postgresql",
+        "sqlite",
+        "mssql",
+        "oracle",
+        "clickhouse"
+    ],
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "EP App",
+            "role": "Developer"
+        }
+    ],
+    "require": {
+        "php": "^8.0"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^10.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "Ep\\App\\QBuilder\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Ep\\App\\QBuilder\\Tests\\": "tests/"
+        }
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true
+}
