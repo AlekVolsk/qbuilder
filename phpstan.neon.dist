@@ -1,0 +1,17 @@
+parameters:
+    level: 10
+    parallel:
+        jobSize: 20
+        maximumNumberOfProcesses: 20
+        minimumNumberOfJobsPerProcess: 2
+        processTimeout: 900.0
+    tmpDir: build-dev/phpstan.cache
+    paths:
+        - src
+        - tests
+    checkMaybeUndefinedVariables: true
+    checkUninitializedProperties: true
+    checkExplicitMixedMissingReturn: true
+    reportUnmatchedIgnoredErrors: false
+    treatPhpDocTypesAsCertain: false
+    phpVersion: 80400
