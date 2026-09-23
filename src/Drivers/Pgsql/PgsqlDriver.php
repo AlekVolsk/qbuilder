@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace QBuilder\Drivers\Pgsql;
 
 use QBuilder\Builder\ConflictBuilderInterface;

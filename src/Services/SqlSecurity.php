@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace QBuilder\Services;
 
 use QBuilder\Exceptions\InvalidIdentifierException;

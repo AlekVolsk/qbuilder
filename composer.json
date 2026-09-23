@@ -1,5 +1,5 @@
 {
-    "name": "qbuilder/qbuilder",
+    "name": "alekvolsk/qbuilder",
     "description": "SQL Query Builder with fluent interface supporting multiple database drivers (MySQL, PostgreSQL, SQLite, MSSQL, Oracle, ClickHouse)",
     "type": "library",
     "keywords": [
@@ -17,11 +17,11 @@
     "authors": [
         {
             "name": "QBuilder",
-            "email": "support@qbuilder.dev",
+            "email": "alekvolsk@gmail.com",
             "role": "Developer"
         }
     ],
-    "homepage": "https://github.com/qbuilder/qbuilder",
+    "homepage": "https://github.com/alekvolsk/qbuilder",
     "require": {
         "php": ">=8.4"
     },
@@ -35,9 +35,9 @@
         "ext-pcov": "PCOV extension for code coverage analysis (recommended for faster coverage)"
     },
     "require-dev": {
-        "phpunit/phpunit": ">=12.0",
-        "phpstan/phpstan": ">=2.1",
-        "friendsofphp/php-cs-fixer": ">=3.89"
+        "phpunit/phpunit": "^13.3",
+        "phpstan/phpstan": "^2.2",
+        "friendsofphp/php-cs-fixer": "^3.95"
     },
     "autoload": {
         "psr-4": {
@@ -60,8 +60,8 @@
         "cs-check": "php-cs-fixer fix --dry-run --diff"
     },
     "support": {
-        "issues": "https://github.com/qbuilder/qbuilder/issues",
-        "source": "https://github.com/qbuilder/qbuilder"
+        "issues": "https://github.com/alekvolsk/qbuilder/issues",
+        "source": "https://github.com/alekvolsk/qbuilder"
     },
     "minimum-stability": "stable",
     "prefer-stable": true
