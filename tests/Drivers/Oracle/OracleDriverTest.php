@@ -157,7 +157,7 @@ final class OracleDriverTest extends TestCase
             ->build(true)
         ;
 
-        self::assertSame("SELECT * FROM \"USERS\" WHERE (\"NAME\" LIKE '50\\%')", $sql);
+        self::assertSame("SELECT * FROM \"USERS\" WHERE (\"NAME\" LIKE '50!%%' ESCAPE '!')", $sql);
     }
 
     public function testOracleComplexJoin(): void
@@ -235,7 +235,7 @@ final class OracleDriverTest extends TestCase
         ;
 
         $expected = 'SELECT * FROM "USERS" WHERE (EXISTS '
-            .'(SELECT "1" FROM "ORDERS" WHERE ("ORDERS"."USER_ID" = "USERS"."ID") '
+            .'(SELECT 1 FROM "ORDERS" WHERE ("ORDERS"."USER_ID" = "USERS"."ID") '
             .'AND ("TOTAL" >= 1000)))';
 
         self::assertSame($expected, $sql);

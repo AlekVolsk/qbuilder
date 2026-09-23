@@ -181,7 +181,7 @@ class RecursiveCteBuilder
         $sql .= $this->finalSelect->build();
 
         if ($compact) {
-            $compactor = new SqlCompactor();
+            $compactor = new SqlCompactor($driver->usesBackslashEscapes());
 
             return $compactor->compact($sql);
         }

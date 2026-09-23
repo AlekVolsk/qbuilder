@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace QBuilder\Drivers;
 
 use QBuilder\Builder\ConflictBuilderInterface;
+use QBuilder\Exceptions\InvalidQueryException;
 use QBuilder\Exceptions\UnsupportedFeatureException;
 use QBuilder\QueryBuilder;
 
@@ -71,6 +72,20 @@ interface DriverInterface
     public function quoteValue(string $value): string;
 
     /**
+     * Format PHP value as SQL literal by its PHP type.
+     *
+     * int and finite float are unquoted, string is always quoted (even numeric-looking),
+     * bool is the driver boolean literal, null is NULL.
+     *
+     * @param ?scalar $value Value to format
+     *
+     * @return string SQL literal
+     *
+     * @throws InvalidQueryException If float value is INF or NAN
+     */
+    public function formatValue(bool|float|int|string|null $value): string;
+
+    /**
      * Escape special characters in LIKE pattern.
      *
      * @param string $pattern LIKE pattern
@@ -78,6 +93,44 @@ interface DriverInterface
      * @return string Escaped pattern
      */
     public function escapeLikePattern(string $pattern): string;
+
+    /**
+     * Get ESCAPE clause appended to LIKE when the pattern contains escaped characters.
+     *
+     * @return string SQL fragment with leading space, or empty string when the dialect escapes implicitly
+     */
+    public function getLikeEscapeClause(): string;
+
+    /**
+     * Does backslash escape the next character inside string literals of this dialect.
+     */
+    public function usesBackslashEscapes(): bool;
+
+    /**
+     * Build index hint clause placed right after a table reference and its alias.
+     *
+     * @param list<array{type:string,indexes:list<string>,for:string}> $hints Hints added by useIndex(),
+     *                                                                        forceIndex(), ignoreIndex()
+     *
+     * @return string SQL fragment with leading space, or empty string when the dialect ignores index hints
+     *
+     * @throws UnsupportedFeatureException If the dialect cannot express a requested hint
+     */
+    public function buildIndexHints(array $hints): string;
+
+    /**
+     * Set database server version, e.g. from PDO::ATTR_SERVER_VERSION.
+     *
+     * Used to choose syntax that differs between server versions. Empty string means unknown.
+     *
+     * @param string $version Server version string
+     */
+    public function setServerVersion(string $version): static;
+
+    /**
+     * Get database server version set by setServerVersion(), or empty string when unknown.
+     */
+    public function getServerVersion(): string;
 
     /**
      * Get LIMIT string for pagination.

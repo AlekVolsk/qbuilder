@@ -7,6 +7,8 @@ namespace QBuilder\Drivers\Mssql;
 use QBuilder\Builder\ConflictBuilderInterface;
 use QBuilder\Drivers\AbstractDriver;
 use QBuilder\Drivers\SqlBuilderInterface;
+use QBuilder\Exceptions\UnsupportedFeatureException;
+use QBuilder\QbConsts;
 use QBuilder\QueryBuilder;
 
 /**
@@ -49,6 +51,12 @@ class MssqlDriver extends AbstractDriver
         return str_replace('_', '[_]', $pattern);
     }
 
+    #[\Override]
+    public function getLikeEscapeClause(): string
+    {
+        return '';
+    }
+
     public function getLimitSql(int $limit, ?int $offset = null, bool $withTies = false): string
     {
         $rowsClause = $withTies ? ' ROWS WITH TIES' : ' ROWS ONLY';
@@ -78,5 +86,41 @@ class MssqlDriver extends AbstractDriver
     public function createConflictBuilder(QueryBuilder $queryBuilder): ConflictBuilderInterface
     {
         return $this->createMergeBuilder($queryBuilder);
+    }
+
+    /**
+     * Build table hint WITH (INDEX(...)) from FORCE INDEX hints.
+     *
+     * MS SQL Server index hint always forces the index and has no scope,
+     * so USE INDEX, IGNORE INDEX and FOR ... have no equivalent.
+     *
+     * @param list<array{type:string,indexes:list<string>,for:string}> $hints Index hints
+     *
+     * @return string SQL fragment with leading space, or empty string without hints
+     *
+     * @throws UnsupportedFeatureException If a hint other than FORCE INDEX without scope is requested
+     */
+    #[\Override]
+    public function buildIndexHints(array $hints): string
+    {
+        $indexes = [];
+
+        foreach ($hints as $hint) {
+            if (QbConsts::INDEX_FORCE !== $hint['type'] || '' !== $hint['for']) {
+                throw new UnsupportedFeatureException(
+                    'MS SQL Server supports only forceIndex() without scope: its INDEX table hint always forces '
+                        .'the index. '.$hint['type'].' INDEX'.('' === $hint['for'] ? '' : ' FOR '.$hint['for'])
+                        .' has no equivalent'
+                );
+            }
+
+            array_push($indexes, ...$hint['indexes']);
+        }
+
+        if ([] === $indexes) {
+            return '';
+        }
+
+        return ' WITH (INDEX('.implode(', ', array_map($this->quoteName(...), $indexes)).'))';
     }
 }

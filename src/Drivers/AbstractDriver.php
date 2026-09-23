@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace QBuilder\Drivers;
 
+use QBuilder\Exceptions\InvalidQueryException;
 use QBuilder\QueryBuilder;
 
 /**
@@ -14,6 +15,8 @@ use QBuilder\QueryBuilder;
  */
 abstract class AbstractDriver implements DriverInterface
 {
+    protected string $serverVersion = '';
+
     public function __construct() {}
 
     /**
@@ -114,15 +117,36 @@ abstract class AbstractDriver implements DriverInterface
         return $quote.$escaped.$quote;
     }
 
+    public function formatValue(bool|float|int|string|null $value): string
+    {
+        if (null === $value) {
+            return 'NULL';
+        }
+
+        if (\is_bool($value)) {
+            return $this->formatBool($value);
+        }
+
+        if (\is_int($value)) {
+            return (string) $value;
+        }
+
+        if (\is_float($value)) {
+            if (! is_finite($value)) {
+                throw new InvalidQueryException('Float value must be finite, got '.var_export($value, true));
+            }
+
+            return (string) $value;
+        }
+
+        return $this->quoteValue($value);
+    }
+
     /**
-     * Escape LIKE pattern special characters.
+     * Escape LIKE pattern special characters with the explicit escape character.
      *
-     * Default implementation escapes:
-     * - Backslash (\)
-     * - Percent (%)
-     * - Underscore (_)
-     *
-     * Override in specific drivers for different behavior.
+     * Default escape character is "!", declared by the ESCAPE clause, so the result
+     * does not depend on backslash handling in string literals (sql_mode, standard_conforming_strings).
      *
      * @param string $pattern LIKE pattern
      *
@@ -130,10 +154,36 @@ abstract class AbstractDriver implements DriverInterface
      */
     public function escapeLikePattern(string $pattern): string
     {
-        $pattern = str_replace('\\', '\\\\', $pattern);
-        $pattern = str_replace('%', '\%', $pattern);
+        $escape = $this->getLikeEscapeChar();
 
-        return str_replace('_', '\_', $pattern);
+        return str_replace([$escape, '%', '_'], [$escape.$escape, $escape.'%', $escape.'_'], $pattern);
+    }
+
+    public function getLikeEscapeClause(): string
+    {
+        return ' ESCAPE '.$this->quoteValue($this->getLikeEscapeChar());
+    }
+
+    public function usesBackslashEscapes(): bool
+    {
+        return false;
+    }
+
+    public function buildIndexHints(array $hints): string
+    {
+        return '';
+    }
+
+    public function setServerVersion(string $version): static
+    {
+        $this->serverVersion = $version;
+
+        return $this;
+    }
+
+    public function getServerVersion(): string
+    {
+        return $this->serverVersion;
     }
 
     /**
@@ -158,6 +208,30 @@ abstract class AbstractDriver implements DriverInterface
     public function supportsConflictHandler(): bool
     {
         return true;
+    }
+
+    /**
+     * Get escape character for LIKE patterns.
+     *
+     * @return string Single character
+     */
+    protected function getLikeEscapeChar(): string
+    {
+        return '!';
+    }
+
+    /**
+     * Format boolean as SQL literal.
+     *
+     * Default: 1 / 0. PostgreSQL: TRUE / FALSE.
+     *
+     * @param bool $value Value to format
+     *
+     * @return string SQL literal
+     */
+    protected function formatBool(bool $value): string
+    {
+        return $value ? '1' : '0';
     }
 
     /**

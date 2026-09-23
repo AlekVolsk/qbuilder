@@ -86,6 +86,44 @@ $qb->select(
 )->from('orders');
 ```
 
+### Числовой литерал
+
+Целое число без знака выбирается как литерал, без кавычек — например, для `EXISTS (SELECT 1 ...)`:
+
+```php
+$qb->select('1')->from('orders');
+// SELECT 1 FROM `orders`
+
+$qb->select(Field::set('0', '', 'zero'));
+// SELECT 0 AS `zero`
+```
+
+### Подсказки индексов
+
+`useIndex()`, `forceIndex()`, `ignoreIndex()` ставятся в цепочке сразу после таблицы, к которой относятся: после `from()` или после join. Каждый метод принимает имя индекса или массив имён и необязательную область действия — `QbConsts::INDEX_FOR_JOIN`, `INDEX_FOR_ORDER_BY`, `INDEX_FOR_GROUP_BY`.
+
+```php
+use QBuilder\QbConsts;
+
+$qb->select('id')
+    ->from('orders', 'o')->forceIndex('idx_created')
+    ->ignoreIndex(['idx_a', 'idx_b'], QbConsts::INDEX_FOR_ORDER_BY)
+    ->leftJoin('users', 'u', $condition)->useIndex('PRIMARY')
+    ->build();
+
+// MySQL:
+// SELECT `o`.`id` FROM `orders` AS `o` FORCE INDEX (`idx_created`) IGNORE INDEX FOR ORDER BY (`idx_a`, `idx_b`)
+// LEFT JOIN `users` AS `u` USE INDEX (`PRIMARY`) ON (...)
+```
+
+| СУБД | Поддержка |
+|---|---|
+| MySQL / MariaDB | все три хинта и области действия; `useIndex([])` → `USE INDEX ()` — не использовать индексы |
+| MS SQL Server | только `forceIndex()` без области → `WITH (INDEX([ix_a], [ix_b]))`; `useIndex()`, `ignoreIndex()` и области бросают `UnsupportedFeatureException` — табличный хинт INDEX в MS SQL всегда принудительный |
+| PostgreSQL, SQLite, Oracle, ClickHouse | хинты игнорируются: они не меняют результат запроса, поэтому один и тот же код работает на всех СУБД |
+
+Ограничения: хинты допустимы только в SELECT и только для таблицы (не для подзапроса); `useIndex()` и `forceIndex()` нельзя сочетать для одной таблицы; вызов до `from()` бросает `InvalidQueryException`.
+
 ## DISTINCT
 
 ```php

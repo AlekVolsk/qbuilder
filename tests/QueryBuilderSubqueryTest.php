@@ -103,7 +103,7 @@ final class QueryBuilderSubqueryTest extends TestCase
         ;
 
         $expected = 'SELECT * FROM `users` WHERE (EXISTS '
-            .'(SELECT `1` FROM `orders` WHERE (`orders`.`user_id` = `users`.`id`) AND (`total` >= 1000)))';
+            .'(SELECT 1 FROM `orders` WHERE (`orders`.`user_id` = `users`.`id`) AND (`total` >= 1000)))';
 
         self::assertSame($expected, $sql);
     }
@@ -125,7 +125,7 @@ final class QueryBuilderSubqueryTest extends TestCase
         ;
 
         $expected = 'SELECT * FROM `users` WHERE (NOT EXISTS '
-            .'(SELECT `1` FROM `orders` WHERE (`orders`.`user_id` = `users`.`id`)))';
+            .'(SELECT 1 FROM `orders` WHERE (`orders`.`user_id` = `users`.`id`)))';
 
         self::assertSame($expected, $sql);
     }

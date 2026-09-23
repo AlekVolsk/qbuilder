@@ -119,7 +119,7 @@ class ClickhouseSqlBuilder extends AbstractSqlBuilder
 
             foreach ($insertFields as $field) {
                 $value = $row[$field] ?? null;
-                $valuePlaceholders[] = $this->formatValue($value);
+                $valuePlaceholders[] = $this->driver->formatValue($value);
             }
             $allRows[] = '('.implode(', ', $valuePlaceholders).')';
         }

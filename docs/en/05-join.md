@@ -53,6 +53,22 @@ $qb->leftJoin('users', 'u', $condition);
 // LEFT JOIN `users` AS `u` ON (`u`.`id` = `orders`.`user_id`) AND (`u`.`status` = 'active')
 ```
 
+### Fields in a JOIN Condition
+
+A field without a table in a JOIN condition refers to the joined table and gets its alias (or the table name when there is no alias) — on every database and for any condition: `eq`, `in`, `like`, `isNull`, `between`, etc. A field with a table (`'o.user_id'`, `Field::set('user_id', 'o')`, the `targetTable` argument) stays as given; `raw()` is not changed.
+
+```php
+$condition = ConditionJoin::create($qb, 'id', 'user_id', 'o')
+    ->and()->in('status', ['active', 'trial'])
+    ->and()->isNull('deleted_at');
+
+$qb->select('*')->from('orders', 'o')->innerJoin('users', 'u', $condition);
+
+// PostgreSQL:
+// INNER JOIN "users" AS "u" ON ("u"."id" = "o"."user_id") AND ("u"."status" IN ('active', 'trial'))
+// AND ("u"."deleted_at" IS NULL)
+```
+
 ## INNER JOIN
 
 ```php

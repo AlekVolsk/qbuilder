@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace QBuilder\Tests;
 
 use PHPUnit\Framework\TestCase;
+use QBuilder\Condition\ConditionJoin;
 use QBuilder\Condition\Field;
 use QBuilder\QbConsts;
 use QBuilder\QueryBuilder;
@@ -327,36 +328,73 @@ final class ConditionAdvancedTest extends TestCase
         self::assertStringContainsString('99.99', $sql);
     }
 
-    public function testInFiltersEmptyStrings(): void
+    public function testInKeepsEmptyStringArrayElements(): void
     {
-        $qb = new QueryBuilder();
-        $sql = $qb->select('*')
+        $sql = (new QueryBuilder())->select('*')
             ->from('users')
             ->where()
-            ->in('status', ['active', '', 'pending', ''])
+            ->in('status', ['active', '', 'pending'])
             ->end()
             ->build(true)
         ;
 
-        self::assertStringContainsString('active', $sql);
-        self::assertStringContainsString('pending', $sql);
-        self::assertStringNotContainsString('\'\'', $sql);
+        self::assertSame("SELECT * FROM `users` WHERE (`status` IN ('active', '', 'pending'))", $sql);
     }
 
-    public function testNotInFiltersEmptyStrings(): void
+    public function testNotInKeepsEmptyStringArrayElements(): void
     {
-        $qb = new QueryBuilder();
-        $sql = $qb->select('*')
+        $sql = (new QueryBuilder())->select('*')
             ->from('users')
             ->where()
-            ->notIn('status', ['banned', '', 'deleted'])
+            ->notIn('status', [''])
             ->end()
             ->build(true)
         ;
 
-        self::assertStringContainsString('banned', $sql);
-        self::assertStringContainsString('deleted', $sql);
-        self::assertStringNotContainsString('\'\'', $sql);
+        self::assertSame("SELECT * FROM `users` WHERE (`status` NOT IN (''))", $sql);
+    }
+
+    public function testInDropsEmptyElementsOfCommaSeparatedString(): void
+    {
+        $sql = (new QueryBuilder())->select('*')
+            ->from('users')
+            ->where()
+            ->in('status', 'active,,pending,')
+            ->end()
+            ->build(true)
+        ;
+
+        self::assertSame("SELECT * FROM `users` WHERE (`status` IN ('active', 'pending'))", $sql);
+    }
+
+    public function testNotInWithOnlyEmptyCommaSeparatedStringIsAlwaysTrue(): void
+    {
+        $sql = (new QueryBuilder())->select('*')
+            ->from('users')
+            ->where()
+            ->notIn('status', ',,')
+            ->end()
+            ->build(true)
+        ;
+
+        self::assertSame('SELECT * FROM `users` WHERE (1 = 1)', $sql);
+    }
+
+    public function testInSameOutputForWhereHavingAndJoin(): void
+    {
+        $qb = new QueryBuilder();
+        $join = ConditionJoin::create($qb, 'user_id', 'id', 'u')->in('type', ['0012', 7, null]);
+        $sql = $qb->select('*')
+            ->from('users', 'u')
+            ->leftJoin('orders', 'o', $join)
+            ->where()->in('code', ['0012', 7, null])->end()
+            ->having()->in('grp', ['0012', 7, null])->end()
+            ->build(true)
+        ;
+
+        self::assertStringContainsString("`type` IN ('0012', 7, NULL)", $sql);
+        self::assertStringContainsString("`code` IN ('0012', 7, NULL)", $sql);
+        self::assertStringContainsString("`grp` IN ('0012', 7, NULL)", $sql);
     }
 
     public function testIsNullWithFieldObject(): void

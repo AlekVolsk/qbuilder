@@ -28,14 +28,14 @@ $qb->where(static fn (ConditionBuilder $q): ConditionBuilder => $q->eq('status',
 $qb->where()
     ->eq('status', 'active')
     ->and()->gt('age', 18)
-    ->and()->like('name', 'John%')
+    ->and()->like('name', 'John', QbConsts::LIKE_RIGHT)
     ->end();
 
 // Alternative syntax
 $qb->where(static fn (ConditionBuilder $q): ConditionBuilder =>
     $q->eq('status', 'active')
       ->and()->gt('age', 18)
-      ->and()->like('name', 'John%')
+      ->and()->like('name', 'John', QbConsts::LIKE_RIGHT)
 );
 ```
 

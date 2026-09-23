@@ -168,7 +168,7 @@ final class SqliteDriverTest extends TestCase
             ->build(true)
         ;
 
-        self::assertSame('SELECT * FROM "users" WHERE ("name" LIKE \'50\%\')', $sql);
+        self::assertSame('SELECT * FROM "users" WHERE ("name" LIKE \'50!%%\' ESCAPE \'!\')', $sql);
     }
 
     public function testSqliteComplexJoin(): void
@@ -246,7 +246,7 @@ final class SqliteDriverTest extends TestCase
         ;
 
         $expected = 'SELECT * FROM "users" WHERE (EXISTS '
-            .'(SELECT "1" FROM "orders" WHERE ("orders"."user_id" = "users"."id") AND ("total" >= 1000)))';
+            .'(SELECT 1 FROM "orders" WHERE ("orders"."user_id" = "users"."id") AND ("total" >= 1000)))';
 
         self::assertSame($expected, $sql);
     }

@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace QBuilder\Tests;
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use QBuilder\Condition\ConditionBy;
 use QBuilder\Condition\ConditionJoin;
 use QBuilder\Condition\Field;
+use QBuilder\Drivers\Mysql\MysqlDriver;
 use QBuilder\QbConsts;
 use QBuilder\QueryBuilder;
 
@@ -181,7 +183,42 @@ final class MysqlDriverTest extends TestCase
             ->build(true)
         ;
 
-        self::assertSame('SELECT * FROM `users` WHERE (`name` LIKE \'50\\\%\')', $sql);
+        self::assertSame("SELECT * FROM `users` WHERE (`name` LIKE '50!%%' ESCAPE '!')", $sql);
+    }
+
+    /**
+     * @param non-empty-string $value
+     */
+    #[DataProvider('provideMysqlEscapeValueCases')]
+    public function testMysqlEscapeValue(string $value, string $expected): void
+    {
+        self::assertSame($expected, (new MysqlDriver())->quoteValue($value));
+    }
+
+    /**
+     * @return iterable<string, array{non-empty-string, string}>
+     */
+    public static function provideMysqlEscapeValueCases(): iterable
+    {
+        yield 'single quote is doubled' => ["O'Neil", "'O''Neil'"];
+
+        yield 'backslash is doubled' => ['C:\dir\\', "'C:\\\\dir\\\\'"];
+
+        yield 'backslash before quote' => ["a\\'b", "'a\\\\''b'"];
+
+        yield 'double quote as is' => ['say "hi"', "'say \"hi\"'"];
+
+        yield 'control characters as is' => ["a\nb\rc\0d\x1ae", "'a\nb\rc\0d\x1ae'"];
+    }
+
+    public function testMysqlQuoteCannotBeClosedByBackslashPayload(): void
+    {
+        $sql = $this->getQueryBuilder()->select('name')->from('t')
+            ->where()->eq('name', "a\\') OR 1=1 -- ")->end()
+            ->build(true)
+        ;
+
+        self::assertSame("SELECT `name` FROM `t` WHERE (`name` = 'a\\\\'') OR 1=1 -- ')", $sql);
     }
 
     public function testMysqlComplexJoin(): void

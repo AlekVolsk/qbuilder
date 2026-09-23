@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace QBuilder\Tests;
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use QBuilder\Drivers\Mysql\MysqlDriver;
 use QBuilder\Drivers\Mysql\MysqlOnDuplicateKeyUpdateBuilder;
 use QBuilder\Drivers\Pgsql\PgsqlOnConflictBuilder;
 use QBuilder\Drivers\Sqlite\SqliteOnConflictBuilder;
@@ -70,30 +72,94 @@ final class OnConflictBuilderTest extends TestCase
         self::assertStringContainsString('`views` = `views` + 1', $sql);
     }
 
-    public function testMysqlExcludedUsesValuesKeyword(): void
+    public function testMysqlExcludedUsesValuesFunctionWhenVersionUnknown(): void
     {
         $qb = new QueryBuilder(QbConsts::DRIVER_PDO_MYSQL);
-        $driver = $qb->getDriverInstance();
-        $builder = MysqlOnDuplicateKeyUpdateBuilder::create($qb, $driver);
+        $builder = MysqlOnDuplicateKeyUpdateBuilder::create($qb, $qb->getDriverInstance());
 
-        $sql = $builder->excluded('email')
-            ->build()
-        ;
-
-        self::assertStringContainsString('VALUES.`email`', $sql);
+        self::assertSame('`email` = VALUES(`email`)', $builder->excluded('email')->build());
     }
 
     public function testMysqlExcludedWithDifferentFieldNames(): void
     {
         $qb = new QueryBuilder(QbConsts::DRIVER_PDO_MYSQL);
-        $driver = $qb->getDriverInstance();
-        $builder = MysqlOnDuplicateKeyUpdateBuilder::create($qb, $driver);
+        $builder = MysqlOnDuplicateKeyUpdateBuilder::create($qb, $qb->getDriverInstance());
 
-        $sql = $builder->excluded('name', 'user_name')
-            ->build()
+        self::assertSame('`name` = VALUES(`user_name`)', $builder->excluded('name', 'user_name')->build());
+    }
+
+    public function testMysqlExcludedUsesRowAliasOnMysql8019(): void
+    {
+        $qb = (new QueryBuilder(QbConsts::DRIVER_PDO_MYSQL))->setServerVersion('8.0.45');
+        $conflict = $qb->conflictBuilder()->excluded('email')->increment('n');
+
+        $sql = $qb->insert('u')->insertRow(['id' => 1, 'email' => 'a'])
+            ->insertConflictHandler($conflict)
+            ->build(true)
         ;
 
-        self::assertStringContainsString('VALUES.`user_name`', $sql);
+        self::assertSame(
+            "INSERT INTO `u` (`id`, `email`) VALUES (1, 'a') AS `new` "
+                .'ON DUPLICATE KEY UPDATE `email` = `new`.`email`, `n` = `n` + 1',
+            $sql
+        );
+    }
+
+    public function testMysqlExcludedUsesValuesFunctionOnMariadb(): void
+    {
+        $qb = (new QueryBuilder(QbConsts::DRIVER_PDO_MYSQL))->setServerVersion('5.5.5-10.11.6-MariaDB-0+deb12u1');
+        $conflict = $qb->conflictBuilder()->excluded('email');
+
+        $sql = $qb->insert('u')->insertRow(['id' => 1, 'email' => 'a'])
+            ->insertConflictHandler($conflict)
+            ->build(true)
+        ;
+
+        self::assertSame(
+            "INSERT INTO `u` (`id`, `email`) VALUES (1, 'a') ON DUPLICATE KEY UPDATE `email` = VALUES(`email`)",
+            $sql
+        );
+    }
+
+    /**
+     * @param non-empty-string $version
+     */
+    #[DataProvider('provideMysqlRowAliasSupportByServerVersionCases')]
+    public function testMysqlRowAliasSupportByServerVersion(string $version, bool $expected): void
+    {
+        self::assertSame($expected, (new MysqlDriver())->setServerVersion($version)->supportsInsertRowAlias());
+    }
+
+    /**
+     * @return iterable<string, array{non-empty-string, bool}>
+     */
+    public static function provideMysqlRowAliasSupportByServerVersionCases(): iterable
+    {
+        yield 'mysql 8.0.18' => ['8.0.18', false];
+
+        yield 'mysql 8.0.19' => ['8.0.19', true];
+
+        yield 'mysql 8.4 lts' => ['8.4.3', true];
+
+        yield 'mysql 9 with suffix' => ['9.1.0-commercial', true];
+
+        yield 'mysql 5.7' => ['5.7.44-log', false];
+
+        yield 'mariadb' => ['10.11.6-MariaDB', false];
+
+        yield 'mariadb with compat prefix' => ['5.5.5-11.4.2-MariaDB-ubu2404', false];
+
+        yield 'garbage' => ['unknown', false];
+    }
+
+    public function testServerVersionIsInheritedBySubqueryAndAppliedAfterDriverCreated(): void
+    {
+        $qb = new QueryBuilder(QbConsts::DRIVER_PDO_MYSQL);
+        $qb->getDriverInstance();
+        $qb->setServerVersion('8.0.45');
+
+        self::assertSame('8.0.45', $qb->getDriverInstance()->getServerVersion());
+        self::assertSame('8.0.45', $qb->subQuery()->getDriverInstance()->getServerVersion());
     }
 
     public function testMysqlConflictTargetDoesNothing(): void
@@ -105,20 +171,6 @@ final class OnConflictBuilderTest extends TestCase
         $result = $builder->conflictTarget(['email']);
 
         self::assertSame($builder, $result);
-    }
-
-    public function testMysqlGetExcludedKeywordReturnsValues(): void
-    {
-        $qb = new QueryBuilder(QbConsts::DRIVER_PDO_MYSQL);
-        $driver = $qb->getDriverInstance();
-        $builder = MysqlOnDuplicateKeyUpdateBuilder::create($qb, $driver);
-
-        $reflection = new \ReflectionClass($builder);
-        $method = $reflection->getMethod('getExcludedKeyword');
-        $method->setAccessible(true);
-        $result = $method->invoke($builder);
-
-        self::assertSame('VALUES', $result);
     }
 
     public function testMysqlBuildConflictClauseReturnsEmptyString(): void

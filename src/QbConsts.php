@@ -11,8 +11,8 @@ namespace QBuilder;
  */
 class QbConsts
 {
-    // Drivers
-    public const string DRIVER_PDO_MYSQL = 'pdomysql'; // Default
+    /** Default driver. */
+    public const string DRIVER_PDO_MYSQL = 'pdomysql';
     public const string DRIVER_MYSQL = 'mysql';
     public const string DRIVER_MSSQL = 'dblib';
     public const string DRIVER_ORACLE = 'oci';
@@ -21,25 +21,29 @@ class QbConsts
     public const string DRIVER_SQLITE = 'sqlite';
     public const string DRIVER_CLICKHOUSE = 'clickhouse';
 
-    // JOIN types
     public const string JOIN_INNER = 'INNER';
     public const string JOIN_LEFT = 'LEFT';
     public const string JOIN_RIGHT = 'RIGHT';
     public const string JOIN_FULL = 'FULL';
     public const string JOIN_CROSS = 'CROSS';
 
-    // LIKE types
     public const string LIKE_FULL = 'full';
     public const string LIKE_LEFT = 'left';
     public const string LIKE_RIGHT = 'right';
 
-    // ORDER types
     public const string ORDER_ASC = 'ASC';
     public const string ORDER_DESC = 'DESC';
 
-    // GROUP types
     public const string TYPE_ORDER = 'ORDER';
     public const string TYPE_GROUP = 'GROUP';
+
+    public const string INDEX_USE = 'USE';
+    public const string INDEX_FORCE = 'FORCE';
+    public const string INDEX_IGNORE = 'IGNORE';
+
+    public const string INDEX_FOR_JOIN = 'JOIN';
+    public const string INDEX_FOR_ORDER_BY = 'ORDER BY';
+    public const string INDEX_FOR_GROUP_BY = 'GROUP BY';
 
     /**
      * Get list of supported drivers.

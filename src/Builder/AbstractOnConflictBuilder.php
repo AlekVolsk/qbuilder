@@ -44,9 +44,8 @@ abstract class AbstractOnConflictBuilder extends AbstractConflictBuilder
         $sourceField = '' === $excludedField ? $field : $excludedField;
         $validatedSourceField = SqlSecurity::validateFieldName($sourceField);
 
-        $keyword = $this->getExcludedKeyword();
         $this->updates[] = $this->quoteField($validatedField)
-            .' = '.$keyword.'.'.$this->quoteField($validatedSourceField);
+            .' = '.$this->formatExcludedReference($this->quoteField($validatedSourceField));
 
         return $this;
     }
@@ -69,11 +68,18 @@ abstract class AbstractOnConflictBuilder extends AbstractConflictBuilder
     }
 
     /**
-     * Get the keyword for excluded/values reference.
-     * PostgreSQL/SQLite: EXCLUDED
-     * MySQL: VALUES.
+     * Format reference to the value proposed for insertion.
+     *
+     * PostgreSQL/SQLite: EXCLUDED.field. MySQL: VALUES(field) or row alias field.
+     *
+     * @param string $quotedField Quoted field name
+     *
+     * @return string SQL reference
      */
-    abstract protected function getExcludedKeyword(): string;
+    protected function formatExcludedReference(string $quotedField): string
+    {
+        return 'EXCLUDED.'.$quotedField;
+    }
 
     /**
      * Build the conflict clause.

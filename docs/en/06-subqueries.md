@@ -69,7 +69,7 @@ $sql = $qb->select('*')
 
 ```php
 $subquery = $qb->subQuery()
-    ->select('*')
+    ->select('1')
     ->from('orders')
     ->where()
         ->eqField('orders', 'user_id', 'users', 'id')
@@ -84,14 +84,14 @@ $sql = $qb->select('*')
     ->build();
 
 // SELECT * FROM `users`
-// WHERE (EXISTS (SELECT * FROM `orders` WHERE (`orders`.`user_id` = `users`.`id`) AND (`total` >= 1000)))
+// WHERE (EXISTS (SELECT 1 FROM `orders` WHERE (`orders`.`user_id` = `users`.`id`) AND (`total` >= 1000)))
 ```
 
 ## Subquery in WHERE (NOT EXISTS)
 
 ```php
 $subquery = $qb->subQuery()
-    ->select('*')
+    ->select('1')
     ->from('orders')
     ->where()
         ->eqField('orders', 'user_id', 'users', 'id')
@@ -105,7 +105,7 @@ $sql = $qb->select('*')
     ->build();
 
 // SELECT * FROM `users`
-// WHERE (NOT EXISTS (SELECT * FROM `orders` WHERE (`orders`.`user_id` = `users`.`id`)))
+// WHERE (NOT EXISTS (SELECT 1 FROM `orders` WHERE (`orders`.`user_id` = `users`.`id`)))
 ```
 
 ## Subquery in WHERE (Comparison)

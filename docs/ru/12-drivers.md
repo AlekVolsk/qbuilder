@@ -6,18 +6,24 @@
 - `ON DUPLICATE KEY UPDATE`
 - `FIND_IN_SET()`
 - Битовые операции
+- Подсказки индексов `USE` / `FORCE` / `IGNORE INDEX`, см. [SELECT](02-select.md#подсказки-индексов)
+- Экранирование строк удвоением кавычки (`''`), см. [Безопасность](11-security.md)
+- `excluded()` в upsert: `VALUES(col)` или алиас `AS new` для MySQL 8.0.19+ при заданной версии сервера, см. [INSERT, UPDATE, DELETE](08-insert-update-delete.md)
 
 ## Особенности PostgreSQL
 
 - `LIMIT count OFFSET offset` синтаксис
 - `ON CONFLICT DO UPDATE`
 - `FETCH FIRST n ROWS WITH TIES`
+- bool как `TRUE` / `FALSE`
+- Значения с обратным слэшем как `E'...'` — корректно при любом `standard_conforming_strings`
 
 ## Особенности ClickHouse
 
 - `LIMIT n BY expressions`
 - `FINAL` модификатор - принудительное слияние данных для получения актуальных данных
 - `WITH TIES`
+- LIKE экранируется обратным слэшем, без `ESCAPE`
 
 **Пример использования FINAL:**
 
@@ -38,6 +44,7 @@ $qb->select('*')
 
 - `TOP n WITH TIES`
 - `MERGE` вместо `UPSERT`
+- `forceIndex()` → `WITH (INDEX(...))`, см. [SELECT](02-select.md#подсказки-индексов)
 - `FETCH NEXT n ROWS ONLY`
 
 ## Особенности Oracle

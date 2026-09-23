@@ -6,6 +6,8 @@ namespace QBuilder\Tests;
 
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use QBuilder\QbConsts;
+use QBuilder\QueryBuilder;
 use QBuilder\Services\SqlCompactor;
 
 /**
@@ -203,5 +205,63 @@ final class SqlCompactorTest extends TestCase
         $result = $compactor->compact($sql);
 
         self::assertSame("SELECT * FROM users WHERE name = 'John'", $result);
+    }
+
+    public function testCompactKeepsLiteralWithBackslashEscapedQuote(): void
+    {
+        $sql = "SELECT *\nFROM t\nWHERE name = 'O\\'Neil  x'  AND  id = 1";
+
+        self::assertSame(
+            "SELECT * FROM t WHERE name = 'O\\'Neil  x' AND id = 1",
+            (new SqlCompactor(true))->compact($sql)
+        );
+    }
+
+    public function testCompactKeepsLiteralEndingWithEscapedBackslash(): void
+    {
+        $sql = "SELECT 'C:\\\\dir\\\\'  ,  'a  b'";
+
+        self::assertSame("SELECT 'C:\\\\dir\\\\' , 'a  b'", (new SqlCompactor(true))->compact($sql));
+    }
+
+    public function testCompactTreatsBackslashAsOrdinaryWithoutBackslashEscapes(): void
+    {
+        $sql = "SELECT 'a\\'  ,  'b  c'";
+
+        self::assertSame("SELECT 'a\\' , 'b  c'", (new SqlCompactor())->compact($sql));
+    }
+
+    public function testCompactKeepsNewlineAfterLineComment(): void
+    {
+        $sql = "SELECT id -- primary key\n    FROM   t\nWHERE id = 1";
+
+        self::assertSame("SELECT id -- primary key\nFROM t WHERE id = 1", (new SqlCompactor())->compact($sql));
+    }
+
+    public function testCompactKeepsBlockCommentAsIs(): void
+    {
+        $sql = "SELECT /*+ NO_INDEX(t  idx) it's */  id\nFROM t";
+
+        self::assertSame("SELECT /*+ NO_INDEX(t  idx) it's */ id FROM t", (new SqlCompactor())->compact($sql));
+    }
+
+    public function testCompactKeepsQuotedIdentifiers(): void
+    {
+        $sql = "SELECT `my  col`,  [other  col],  \"third  col\"\nFROM t";
+
+        self::assertSame(
+            'SELECT `my  col`, [other  col], "third  col" FROM t',
+            (new SqlCompactor())->compact($sql)
+        );
+    }
+
+    public function testBuilderCompactKeepsRawMysqlLiteral(): void
+    {
+        $sql = (new QueryBuilder(QbConsts::DRIVER_PDO_MYSQL))->select('*')->from('t')
+            ->where()->raw("`name` = 'O\\'Neil  x'")->end()
+            ->build(true)
+        ;
+
+        self::assertSame("SELECT * FROM `t` WHERE (`name` = 'O\\'Neil  x')", $sql);
     }
 }

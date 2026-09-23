@@ -32,84 +32,6 @@ class ConditionBuilder extends Condition
     protected ?ConditionBuilder $parent = null;
 
     /**
-     * IN: field IN (value1, value2, ...).
-     * Supports NULL values.
-     *
-     * @param Field|string       $field  Field name
-     * @param array<int,?scalar> $values Array of values
-     */
-    public function in(Field|string $field, array|string $values): static
-    {
-        $values = \is_array($values) ? $values : explode(',', $values);
-        $values = array_filter($values, static fn (bool|float|int|string|null $v): bool => '' !== $v);
-
-        if ([] === $values) {
-            $this->addRawCondition('1 = 0');
-
-            return $this;
-        }
-
-        $fieldName = $this->formatFieldName($field);
-        $placeholders = [];
-
-        foreach ($values as $value) {
-            if (null === $value) {
-                $placeholders[] = 'NULL';
-            } elseif (\is_bool($value)) {
-                $placeholders[] = $value ? '1' : '0';
-            } elseif (is_numeric($value)) {
-                $placeholders[] = $value;
-            } else {
-                $placeholders[] = $this->quoteString((string) $value);
-            }
-        }
-
-        $condition = $fieldName.' IN ('.implode(', ', $placeholders).')';
-        $this->addRawCondition($condition);
-
-        return $this;
-    }
-
-    /**
-     * NOT IN: field NOT IN (value1, value2, ...).
-     * Supports NULL values.
-     *
-     * @param Field|string       $field  Field name
-     * @param array<int,?scalar> $values Array of values
-     */
-    public function notIn(Field|string $field, array|string $values): static
-    {
-        $values = \is_array($values) ? $values : explode(',', $values);
-        $values = array_filter($values, static fn (bool|float|int|string|null $v): bool => '' !== $v);
-
-        if ([] === $values) {
-            $this->addRawCondition('1 = 1');
-
-            return $this;
-        }
-
-        $fieldName = $this->formatFieldName($field);
-        $placeholders = [];
-
-        foreach ($values as $value) {
-            if (null === $value) {
-                $placeholders[] = 'NULL';
-            } elseif (\is_bool($value)) {
-                $placeholders[] = $value ? '1' : '0';
-            } elseif (is_numeric($value)) {
-                $placeholders[] = $value;
-            } else {
-                $placeholders[] = $this->quoteString((string) $value);
-            }
-        }
-
-        $condition = $fieldName.' NOT IN ('.implode(', ', $placeholders).')';
-        $this->addRawCondition($condition);
-
-        return $this;
-    }
-
-    /**
      * IN subquery: field IN (SELECT ...).
      *
      * @param Field|string $field    Field name
@@ -393,19 +315,5 @@ class ConditionBuilder extends Condition
         }
 
         return $group;
-    }
-
-    /**
-     * Quote string value for SQL.
-     *
-     * @param string $value String value
-     *
-     * @return string Quoted string
-     */
-    protected function quoteString(string $value): string
-    {
-        $driver = $this->getDriver();
-
-        return $driver->quoteValue($value);
     }
 }

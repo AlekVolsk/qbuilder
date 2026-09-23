@@ -47,6 +47,25 @@ class ClickhouseDriver extends AbstractDriver
         );
     }
 
+    /**
+     * Escape LIKE pattern with backslash, the only LIKE escape mechanism in ClickHouse.
+     *
+     * @param string $pattern LIKE pattern
+     *
+     * @return string Escaped pattern
+     */
+    #[\Override]
+    public function escapeLikePattern(string $pattern): string
+    {
+        return str_replace(['\\', '%', '_'], ['\\\\', '\%', '\_'], $pattern);
+    }
+
+    #[\Override]
+    public function getLikeEscapeClause(): string
+    {
+        return '';
+    }
+
     public function getLimitSql(int $limit, ?int $offset = null, bool $withTies = false): string
     {
         $sql = "\nLIMIT ";
@@ -85,5 +104,11 @@ class ClickhouseDriver extends AbstractDriver
             'ClickHouse does not support conflict handlers (ON DUPLICATE KEY UPDATE / ON CONFLICT). '
                 .'Use ReplacingMergeTree or CollapsingMergeTree engines for data deduplication.'
         );
+    }
+
+    #[\Override]
+    public function usesBackslashEscapes(): bool
+    {
+        return true;
     }
 }

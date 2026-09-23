@@ -16,6 +16,12 @@ class ConditionJoin extends Condition
     protected string $joinAlias = '';
 
     /**
+     * Placeholder put before unqualified fields; build() replaces it with the join table alias.
+     * Random per instance, so it cannot be forged by a value inside a string literal.
+     */
+    private readonly string $joinAliasMarker;
+
+    /**
      * Constructor for quick simple condition creation.
      *
      * @param QueryBuilder              $queryBuilder Parent QueryBuilder
@@ -33,6 +39,8 @@ class ConditionJoin extends Condition
         array|string|null $target = null,
         ?string $targetTable = null
     ) {
+        $this->joinAliasMarker = "\0qb_join_alias_".bin2hex(random_bytes(8))."\0";
+
         parent::__construct($queryBuilder, 'JOIN');
 
         if (null !== $field && null !== $target) {
@@ -91,6 +99,19 @@ class ConditionJoin extends Condition
     }
 
     /**
+     * Build JOIN conditions; unqualified fields are qualified with the join table alias.
+     *
+     * @return string SQL conditions
+     */
+    #[\Override]
+    public function build(): string
+    {
+        $prefix = '' === $this->joinAlias ? '' : $this->getDriver()->quoteName($this->joinAlias).'.';
+
+        return str_replace($this->joinAliasMarker, $prefix, parent::build());
+    }
+
+    /**
      * Set logical operator to AND for next condition.
      */
     public function and(): self
@@ -129,5 +150,24 @@ class ConditionJoin extends Condition
         }
 
         return $target;
+    }
+
+    /**
+     * Format field name; an unqualified field refers to the join table and gets the alias marker.
+     *
+     * @param Field|string $field Field name
+     *
+     * @return string Formatted field name
+     */
+    #[\Override]
+    protected function formatFieldName(Field|string $field): string
+    {
+        $formatted = parent::formatFieldName($field);
+
+        $isUnqualified = $field instanceof Field
+            ? '' === $field->tableOrAlias && ! $field->isExpression() && '*' !== $field->name
+            : ! str_contains($field, '.') && '*' !== $field;
+
+        return $isUnqualified ? $this->joinAliasMarker.$formatted : $formatted;
     }
 }

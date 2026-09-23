@@ -41,12 +41,6 @@ class SqliteOnConflictBuilder extends AbstractOnConflictBuilder
     }
 
     #[\Override]
-    protected function getExcludedKeyword(): string
-    {
-        return 'EXCLUDED';
-    }
-
-    #[\Override]
     protected function buildConflictClause(): string
     {
         if ([] === $this->conflictTargets) {

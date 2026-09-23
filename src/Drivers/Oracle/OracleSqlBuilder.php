@@ -30,15 +30,7 @@ class OracleSqlBuilder extends AbstractSqlBuilder
         $formattedParams = [];
 
         foreach ($params as $param) {
-            if (null === $param) {
-                $formattedParams[] = 'NULL';
-            } elseif (\is_bool($param)) {
-                $formattedParams[] = $param ? '1' : '0';
-            } elseif (is_numeric($param)) {
-                $formattedParams[] = (string) $param;
-            } else {
-                $formattedParams[] = $this->driver->quoteValue((string) $param);
-            }
+            $formattedParams[] = $this->driver->formatValue($param);
         }
 
         $sql = 'BEGIN '.$this->driver->quoteName($procedureName);
@@ -72,7 +64,7 @@ class OracleSqlBuilder extends AbstractSqlBuilder
 
             foreach ($insertFields as $field) {
                 $value = $row[$field] ?? null;
-                $valuePlaceholders[] = $this->formatValue($value);
+                $valuePlaceholders[] = $this->driver->formatValue($value);
             }
             $sql .= '('.implode(', ', $valuePlaceholders).')';
         } else {
@@ -83,7 +75,7 @@ class OracleSqlBuilder extends AbstractSqlBuilder
 
                 foreach ($insertFields as $field) {
                     $value = $row[$field] ?? null;
-                    $valuePlaceholders[] = $this->formatValue($value);
+                    $valuePlaceholders[] = $this->driver->formatValue($value);
                 }
 
                 $selectPrefix = 0 === $index ? 'SELECT ' : 'UNION ALL SELECT ';

@@ -91,15 +91,7 @@ class MssqlSqlBuilder extends AbstractSqlBuilder
         $formattedParams = [];
 
         foreach ($params as $param) {
-            if (null === $param) {
-                $formattedParams[] = 'NULL';
-            } elseif (\is_bool($param)) {
-                $formattedParams[] = $param ? '1' : '0';
-            } elseif (is_numeric($param)) {
-                $formattedParams[] = (string) $param;
-            } else {
-                $formattedParams[] = $this->driver->quoteValue((string) $param);
-            }
+            $formattedParams[] = $this->driver->formatValue($param);
         }
 
         if ([] !== $formattedParams) {

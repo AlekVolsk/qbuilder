@@ -25,7 +25,7 @@ abstract class AbstractSqlBuilder implements SqlBuilderInterface
         protected QueryBuilder $queryBuilder,
         protected DriverInterface $driver
     ) {
-        $this->compactor = new SqlCompactor();
+        $this->compactor = new SqlCompactor($driver->usesBackslashEscapes());
     }
 
     public function build(bool $compact = false): string
@@ -192,7 +192,7 @@ abstract class AbstractSqlBuilder implements SqlBuilderInterface
             $sql .= $this->getAliasKeyword().$this->driver->quoteName($fromAlias);
         }
 
-        return $sql;
+        return $sql.$this->driver->buildIndexHints($this->queryBuilder->getFromIndexHints());
     }
 
     /**
@@ -211,17 +211,19 @@ abstract class AbstractSqlBuilder implements SqlBuilderInterface
     {
         $sql = '';
 
-        foreach ($this->queryBuilder->getJoinClauses() as $join) {
+        foreach ($this->queryBuilder->getJoinClauses() as $position => $join) {
             $sql .= "\n".$join['type'].' JOIN '.$this->driver->quoteName($join['table']);
 
             if (! empty($join['alias']) && $join['alias'] !== $join['table']) {
                 $sql .= $this->getAliasKeyword().$this->driver->quoteName($join['alias']);
             }
 
+            $sql .= $this->driver->buildIndexHints($this->queryBuilder->getJoinIndexHints($position));
+
             if ('CROSS' !== $join['type'] && $join['conditions']->hasConditions()) {
                 $tableOrAlias = ! empty($join['alias']) ? $join['alias'] : $join['table'];
                 $join['conditions']->setJoinAlias($tableOrAlias);
-                $sql .= ' ON'.$this->buildJoinConditions($join['conditions'], $tableOrAlias);
+                $sql .= ' ON'.$this->buildJoinConditions($join['conditions']);
             }
         }
 
@@ -234,7 +236,7 @@ abstract class AbstractSqlBuilder implements SqlBuilderInterface
 
             if ('CROSS' !== $join['type'] && $join['conditions']->hasConditions()) {
                 $join['conditions']->setJoinAlias($join['alias']);
-                $sql .= ' ON'.$this->buildJoinConditions($join['conditions'], $join['alias']);
+                $sql .= ' ON'.$this->buildJoinConditions($join['conditions']);
             }
         }
 
@@ -386,19 +388,12 @@ abstract class AbstractSqlBuilder implements SqlBuilderInterface
      * Build JOIN conditions.
      *
      * @param ConditionJoin $conditions JOIN conditions
-     * @param string        $joinAlias  Join table alias (optional, for driver-specific logic)
      *
      * @return string SQL for JOIN conditions
      */
-    protected function buildJoinConditions(ConditionJoin $conditions, string $joinAlias = ''): string
+    protected function buildJoinConditions(ConditionJoin $conditions): string
     {
-        $sql = $conditions->build();
-
-        return (string) preg_replace_callback(
-            '/["\']__RAW__([^"\']+)["\']/',
-            fn ($matches): string => $this->driver->quoteName($matches[1]),
-            $sql
-        );
+        return $conditions->build();
     }
 
     /**
@@ -454,7 +449,7 @@ abstract class AbstractSqlBuilder implements SqlBuilderInterface
 
             foreach ($insertFields as $field) {
                 $value = $row[$field] ?? null;
-                $valuePlaceholders[] = $this->formatValue($value);
+                $valuePlaceholders[] = $this->driver->formatValue($value);
             }
             $allRows[] = '('.implode(', ', $valuePlaceholders).')';
         }
@@ -464,7 +459,7 @@ abstract class AbstractSqlBuilder implements SqlBuilderInterface
         $conflictData = $this->queryBuilder->getInsertConflictData();
 
         if ('' !== $conflictData && '0' !== $conflictData) {
-            $sql .= "\n".$conflictData;
+            $sql .= $this->buildInsertConflictSuffix($conflictData);
         }
 
         return $sql;
@@ -484,7 +479,7 @@ abstract class AbstractSqlBuilder implements SqlBuilderInterface
         foreach ($updateData as $field => $value) {
             $validatedField = SqlSecurity::validateFieldName($field);
             $quotedField = $this->driver->quoteName($validatedField);
-            $sets[] = $quotedField.' = '.$this->formatValue($value);
+            $sets[] = $quotedField.' = '.$this->driver->formatValue($value);
         }
 
         return implode(', ', $sets);
@@ -537,22 +532,14 @@ abstract class AbstractSqlBuilder implements SqlBuilderInterface
     }
 
     /**
-     * Format value for SQL (NULL, numeric, or quoted string).
+     * Build conflict handling clause appended after INSERT ... VALUES rows.
      *
-     * @param ?scalar $value Value to format
+     * @param string $conflictData Clause built by the conflict builder
      *
-     * @return string Formatted value
+     * @return string SQL fragment
      */
-    protected function formatValue(bool|float|int|string|null $value): string
+    protected function buildInsertConflictSuffix(string $conflictData): string
     {
-        if (null === $value) {
-            return 'NULL';
-        }
-
-        if (is_numeric($value)) {
-            return (string) $value;
-        }
-
-        return $this->driver->quoteValue((string) $value);
+        return "\n".$conflictData;
     }
 }

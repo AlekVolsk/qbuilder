@@ -65,16 +65,8 @@ class OracleMergeBuilder extends AbstractMergeBuilder
             $selects = [];
 
             foreach ($insertFields as $field) {
-                $value = $row[$field] ?? null;
-
-                if (null === $value) {
-                    $selects[] = 'NULL AS '.$this->driver->quoteName($field);
-                } elseif (is_numeric($value)) {
-                    $selects[] = $value.' AS '.$this->driver->quoteName($field);
-                } else {
-                    $selects[] = $this->driver->quoteValue((string) $value).' AS '
-                        .$this->driver->quoteName($field);
-                }
+                $selects[] = $this->driver->formatValue($row[$field] ?? null).' AS '
+                    .$this->driver->quoteName($field);
             }
             $sql .= implode(', ', $selects).' FROM DUAL';
         } else {
@@ -84,15 +76,7 @@ class OracleMergeBuilder extends AbstractMergeBuilder
                 $selects = [];
 
                 foreach ($insertFields as $field) {
-                    $value = $row[$field] ?? null;
-
-                    if (null === $value) {
-                        $selects[] = 'NULL';
-                    } elseif (is_numeric($value)) {
-                        $selects[] = $value;
-                    } else {
-                        $selects[] = $this->driver->quoteValue((string) $value);
-                    }
+                    $selects[] = $this->driver->formatValue($row[$field] ?? null);
                 }
 
                 $prefix = 0 === $index ? 'SELECT ' : 'UNION ALL SELECT ';

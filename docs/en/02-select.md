@@ -86,6 +86,44 @@ $qb->select(
 )->from('orders');
 ```
 
+### Numeric Literal
+
+An unsigned integer is selected as a literal, unquoted — e.g. for `EXISTS (SELECT 1 ...)`:
+
+```php
+$qb->select('1')->from('orders');
+// SELECT 1 FROM `orders`
+
+$qb->select(Field::set('0', '', 'zero'));
+// SELECT 0 AS `zero`
+```
+
+### Index Hints
+
+`useIndex()`, `forceIndex()` and `ignoreIndex()` go in the chain right after the table they apply to: after `from()` or after a join. Each takes an index name or an array of names and an optional scope — `QbConsts::INDEX_FOR_JOIN`, `INDEX_FOR_ORDER_BY`, `INDEX_FOR_GROUP_BY`.
+
+```php
+use QBuilder\QbConsts;
+
+$qb->select('id')
+    ->from('orders', 'o')->forceIndex('idx_created')
+    ->ignoreIndex(['idx_a', 'idx_b'], QbConsts::INDEX_FOR_ORDER_BY)
+    ->leftJoin('users', 'u', $condition)->useIndex('PRIMARY')
+    ->build();
+
+// MySQL:
+// SELECT `o`.`id` FROM `orders` AS `o` FORCE INDEX (`idx_created`) IGNORE INDEX FOR ORDER BY (`idx_a`, `idx_b`)
+// LEFT JOIN `users` AS `u` USE INDEX (`PRIMARY`) ON (...)
+```
+
+| Database | Support |
+|---|---|
+| MySQL / MariaDB | all three hints and scopes; `useIndex([])` → `USE INDEX ()` — use no indexes |
+| MS SQL Server | only `forceIndex()` without scope → `WITH (INDEX([ix_a], [ix_b]))`; `useIndex()`, `ignoreIndex()` and scopes throw `UnsupportedFeatureException` — the MS SQL INDEX table hint always forces the index |
+| PostgreSQL, SQLite, Oracle, ClickHouse | hints are ignored: they do not change the query result, so the same code runs on every database |
+
+Restrictions: hints are allowed only in SELECT and only on a table (not on a subquery); `useIndex()` and `forceIndex()` cannot be combined for one table; calling a hint before `from()` throws `InvalidQueryException`.
+
 ## DISTINCT
 
 ```php

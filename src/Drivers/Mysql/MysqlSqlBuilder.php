@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace QBuilder\Drivers\Mysql;
 
-use QBuilder\Condition\ConditionJoin;
 use QBuilder\Drivers\AbstractSqlBuilder;
 use QBuilder\QueryBuilder;
 
@@ -60,15 +59,7 @@ class MysqlSqlBuilder extends AbstractSqlBuilder
         $formattedParams = [];
 
         foreach ($params as $param) {
-            if (null === $param) {
-                $formattedParams[] = 'NULL';
-            } elseif (\is_bool($param)) {
-                $formattedParams[] = $param ? '1' : '0';
-            } elseif (is_numeric($param)) {
-                $formattedParams[] = (string) $param;
-            } else {
-                $formattedParams[] = $this->driver->quoteValue((string) $param);
-            }
+            $formattedParams[] = $this->driver->formatValue($param);
         }
 
         return $sql.('('.implode(', ', $formattedParams).')');
@@ -93,17 +84,13 @@ class MysqlSqlBuilder extends AbstractSqlBuilder
     }
 
     #[\Override]
-    protected function buildInsertRows(string $sql, array $insertRows, array $insertFields): string
+    protected function buildInsertConflictSuffix(string $conflictData): string
     {
-        $sql = parent::buildInsertRows($sql, $insertRows, $insertFields);
+        $rowAlias = $this->driver instanceof MysqlDriver && $this->driver->supportsInsertRowAlias()
+            ? ' AS '.$this->driver->quoteName(MysqlDriver::INSERT_ROW_ALIAS)
+            : '';
 
-        $conflictData = $this->queryBuilder->getInsertConflictData();
-
-        if ('' !== $conflictData && '0' !== $conflictData) {
-            $sql = str_replace("\n".$conflictData, "\nON DUPLICATE KEY UPDATE ".$conflictData, $sql);
-        }
-
-        return $sql;
+        return $rowAlias."\nON DUPLICATE KEY UPDATE ".$conflictData;
     }
 
     #[\Override]
@@ -140,38 +127,5 @@ class MysqlSqlBuilder extends AbstractSqlBuilder
         }
 
         return $fieldStr;
-    }
-
-    #[\Override]
-    protected function buildJoinConditions(ConditionJoin $conditions, string $joinAlias = ''): string
-    {
-        $sql = parent::buildJoinConditions($conditions, $joinAlias);
-
-        if ('' !== $joinAlias && '0' !== $joinAlias) {
-            $sql = $this->addJoinAliasToFields($sql, $joinAlias);
-        }
-
-        return $sql;
-    }
-
-    /**
-     * Add join table alias to fields without table in JOIN conditions.
-     * MySQL-specific helper for automatic alias addition.
-     *
-     * @param string $sql       SQL condition
-     * @param string $joinAlias Join table alias
-     *
-     * @return string SQL with added aliases
-     */
-    protected function addJoinAliasToFields(string $sql, string $joinAlias): string
-    {
-        $quote = $this->driver->getIdentifierQuote();
-
-        return (string) preg_replace(
-            '/\(('.preg_quote($quote, '/').'[^'.preg_quote($quote, '/').']+'
-                .preg_quote($quote, '/').')\s*(=|!=|>|>=|<|<=)/',
-            '('.$this->driver->quoteName($joinAlias).'.$1 $2',
-            $sql
-        );
     }
 }

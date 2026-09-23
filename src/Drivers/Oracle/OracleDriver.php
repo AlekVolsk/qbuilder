@@ -41,15 +41,6 @@ class OracleDriver extends AbstractDriver
         return str_replace("'", "''", $value);
     }
 
-    public function escapeLikePattern(string $pattern): string
-    {
-        $pattern = str_replace('\\', '\\\\', $pattern);
-        $pattern = str_replace('%', '\%', $pattern);
-        $pattern = str_replace('_', '\_', $pattern);
-
-        return str_replace('[', '\[', $pattern);
-    }
-
     public function getLimitSql(int $limit, ?int $offset = null, bool $withTies = false): string
     {
         $rowsClause = $withTies ? ' ROWS WITH TIES' : ' ROWS ONLY';

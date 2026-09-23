@@ -68,10 +68,23 @@ class MysqlOnDuplicateKeyUpdateBuilder extends AbstractOnConflictBuilder
         return implode(', ', $this->updates);
     }
 
+    /**
+     * Row alias reference `new`.`field` when the server supports it (MySQL 8.0.19+), VALUES(`field`) otherwise.
+     *
+     * @param string $quotedField Quoted field name
+     *
+     * @return string SQL reference
+     */
     #[\Override]
-    protected function getExcludedKeyword(): string
+    protected function formatExcludedReference(string $quotedField): string
     {
-        return 'VALUES';
+        $driver = $this->getDriver();
+
+        if ($driver instanceof MysqlDriver && $driver->supportsInsertRowAlias()) {
+            return $driver->quoteName(MysqlDriver::INSERT_ROW_ALIAS).'.'.$quotedField;
+        }
+
+        return 'VALUES('.$quotedField.')';
     }
 
     #[\Override]

@@ -241,6 +241,24 @@ $qb->where(static fn (ConditionBuilder $q): ConditionBuilder =>
 // WHERE (`status` NOT IN ('deleted', 'banned'))
 ```
 
+### IN / NOT IN Value List
+
+The rules are the same for WHERE, HAVING and JOIN:
+
+- array elements are taken as is — an empty string `''` and `null` are kept in the list (`IN ('', NULL)`); each element is formatted by its type as described in [Security](11-security.md#value-formatting-by-type);
+- a string is split by commas and empty elements are dropped: `in('status', 'active,,pending')` → `IN ('active', 'pending')`;
+- an empty list gives `1 = 0` for `in()` and `1 = 1` for `notIn()`.
+
+Per the SQL standard, `NOT IN` with `NULL` in the list returns no rows, but databases differ — the builder passes `NULL` through unchanged and leaves the decision to the calling code.
+
+```php
+$qb->where()
+    ->in('code', ['0012', 7, '', null])
+    ->end();
+
+// WHERE (`code` IN ('0012', 7, '', NULL))
+```
+
 ### BETWEEN
 
 **Standard syntax:**
@@ -291,7 +309,7 @@ $qb->where(static fn (ConditionBuilder $q): ConditionBuilder =>
 
 ```php
 $qb->where()
-    ->like('name', '%John%')
+    ->like('name', 'John')
     ->end();
 
 // WHERE (`name` LIKE '%John%')
@@ -301,7 +319,7 @@ $qb->where()
 
 ```php
 $qb->where(static fn (ConditionBuilder $q): ConditionBuilder =>
-    $q->like('name', '%John%')
+    $q->like('name', 'John')
 );
 
 // WHERE (`name` LIKE '%John%')
@@ -351,13 +369,23 @@ $qb->where(static fn (ConditionBuilder $q): ConditionBuilder =>
 // WHERE (`name` LIKE '%John')
 ```
 
+**The value is a literal search string.** `%` and `_` in it are escaped; wildcards are added only by the boundary type. MySQL, PostgreSQL, SQLite and Oracle escape with `!` and an explicit `ESCAPE '!'`, so the result does not depend on `sql_mode` or `standard_conforming_strings`; MS SQL uses `[...]`, ClickHouse uses `\`. `ESCAPE` is appended only when the value contained something to escape.
+
+```php
+$qb->where()->like('discount', '50%', QbConsts::LIKE_RIGHT)->end();
+// WHERE (`discount` LIKE '50!%%' ESCAPE '!')   — starts with "50%"
+
+$qb->where()->like('code', 'a_b')->end();
+// WHERE (`code` LIKE '%a!_b%' ESCAPE '!')       — contains "a_b" but not "axb"
+```
+
 ### NOT LIKE
 
 **Standard syntax:**
 
 ```php
 $qb->where()
-    ->notLike('name', '%Admin%')
+    ->notLike('name', 'Admin')
     ->end();
 
 // WHERE (`name` NOT LIKE '%Admin%')
@@ -367,7 +395,7 @@ $qb->where()
 
 ```php
 $qb->where(static fn (ConditionBuilder $q): ConditionBuilder =>
-    $q->notLike('name', '%Admin%')
+    $q->notLike('name', 'Admin')
 );
 
 // WHERE (`name` NOT LIKE '%Admin%')

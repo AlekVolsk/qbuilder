@@ -6,18 +6,24 @@
 - `ON DUPLICATE KEY UPDATE`
 - `FIND_IN_SET()`
 - Bitwise operations
+- Index hints `USE` / `FORCE` / `IGNORE INDEX`, see [SELECT](02-select.md#index-hints)
+- String escaping by doubling the quote (`''`), see [Security](11-security.md)
+- `excluded()` in upsert: `VALUES(col)`, or the `AS new` row alias for MySQL 8.0.19+ when the server version is set, see [INSERT, UPDATE, DELETE](08-insert-update-delete.md)
 
 ## PostgreSQL Specifics
 
 - `LIMIT count OFFSET offset` syntax
 - `ON CONFLICT DO UPDATE`
 - `FETCH FIRST n ROWS WITH TIES`
+- bool as `TRUE` / `FALSE`
+- Values with a backslash as `E'...'` — correct with any `standard_conforming_strings`
 
 ## ClickHouse Specifics
 
 - `LIMIT n BY expressions`
 - `FINAL` modifier - forces a data merge to get up-to-date data
 - `WITH TIES`
+- LIKE is escaped with backslash, without `ESCAPE`
 
 **Example of using FINAL:**
 
@@ -38,6 +44,7 @@ $qb->select('*')
 
 - `TOP n WITH TIES`
 - `MERGE` instead of `UPSERT`
+- `forceIndex()` → `WITH (INDEX(...))`, see [SELECT](02-select.md#index-hints)
 - `FETCH NEXT n ROWS ONLY`
 
 ## Oracle Specifics

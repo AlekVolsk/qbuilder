@@ -63,15 +63,7 @@ class PgsqlSqlBuilder extends AbstractSqlBuilder
                     $values = [];
 
                     foreach ($insertFields as $field) {
-                        $value = $row[$field] ?? null;
-
-                        if (null === $value) {
-                            $values[] = 'NULL';
-                        } elseif (is_numeric($value)) {
-                            $values[] = $value;
-                        } else {
-                            $values[] = $this->driver->quoteValue((string) $value);
-                        }
+                        $values[] = $this->driver->formatValue($row[$field] ?? null);
                     }
                     $valuesSets[] = '('.implode(', ', $values).')';
                 }
@@ -103,10 +95,8 @@ class PgsqlSqlBuilder extends AbstractSqlBuilder
                 } elseif (\is_array($value)) {
                     $formatted = array_map(fn ($item): string => $this->driver->quoteValue((string) $item), $value);
                     $values[] = '('.implode(', ', $formatted).')';
-                } elseif (is_numeric($value)) {
-                    $values[] = (string) $value;
                 } else {
-                    $values[] = $this->driver->quoteValue((string) $value);
+                    $values[] = $this->driver->formatValue($value);
                 }
             }
 
@@ -141,15 +131,7 @@ class PgsqlSqlBuilder extends AbstractSqlBuilder
         $formattedParams = [];
 
         foreach ($params as $param) {
-            if (null === $param) {
-                $formattedParams[] = 'NULL';
-            } elseif (\is_bool($param)) {
-                $formattedParams[] = $param ? 'TRUE' : 'FALSE';
-            } elseif (is_numeric($param)) {
-                $formattedParams[] = (string) $param;
-            } else {
-                $formattedParams[] = $this->driver->quoteValue((string) $param);
-            }
+            $formattedParams[] = $this->driver->formatValue($param);
         }
 
         return $sql.('('.implode(', ', $formattedParams).')');

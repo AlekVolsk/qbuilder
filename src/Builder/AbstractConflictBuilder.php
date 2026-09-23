@@ -72,15 +72,7 @@ abstract class AbstractConflictBuilder implements ConflictBuilderInterface
     {
         $field = SqlSecurity::validateFieldName($field);
 
-        if (null === $value) {
-            $this->updates[] = $this->quoteField($field).' = NULL';
-        } elseif (\is_bool($value)) {
-            $this->updates[] = $this->quoteField($field).' = '.($value ? '1' : '0');
-        } elseif (is_numeric($value)) {
-            $this->updates[] = $this->quoteField($field).' = '.$value;
-        } else {
-            $this->updates[] = $this->quoteField($field).' = '.$this->getDriver()->quoteValue($value);
-        }
+        $this->updates[] = $this->quoteField($field).' = '.$this->getDriver()->formatValue($value);
 
         return $this;
     }

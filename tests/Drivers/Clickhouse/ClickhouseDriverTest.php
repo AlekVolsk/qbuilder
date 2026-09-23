@@ -241,7 +241,7 @@ final class ClickhouseDriverTest extends TestCase
             ->build(true)
         ;
 
-        self::assertSame("SELECT * FROM `users` WHERE (`name` LIKE '50\\\\%')", $sql);
+        self::assertSame("SELECT * FROM `users` WHERE (`name` LIKE '50\\\\%%')", $sql);
     }
 
     public function testClickhouseDistinctQuery(): void

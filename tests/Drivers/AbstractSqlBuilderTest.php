@@ -162,11 +162,7 @@ final class AbstractSqlBuilderTest extends TestCase
 
         $sql = $qb->build(true);
 
-        self::assertStringContainsString('`active`', $sql);
-        self::assertStringContainsString('`verified`', $sql);
-
-        self::assertStringContainsString("'1'", $sql);
-        self::assertStringContainsString("''", $sql);
+        self::assertSame('UPDATE `users` SET `active` = 1, `verified` = 0', $sql);
     }
 
     public function testBuildInsertRowsWithMultipleRows(): void
@@ -209,65 +205,6 @@ final class AbstractSqlBuilderTest extends TestCase
 
         self::assertStringContainsString('99.99', $sql);
         self::assertStringContainsString('10', $sql);
-    }
-
-    public function testFormatValueWithNull(): void
-    {
-        $qb = $this->getQueryBuilder();
-        $sqlBuilder = $qb->getDriverInstance()->getSqlBuilder($qb);
-
-        $reflection = new \ReflectionClass($sqlBuilder);
-        $method = $reflection->getMethod('formatValue');
-        $method->setAccessible(true);
-        $result = $method->invoke($sqlBuilder, null);
-
-        self::assertSame('NULL', $result);
-    }
-
-    public function testFormatValueWithNumericValue(): void
-    {
-        $qb = $this->getQueryBuilder();
-        $sqlBuilder = $qb->getDriverInstance()->getSqlBuilder($qb);
-
-        $reflection = new \ReflectionClass($sqlBuilder);
-        $method = $reflection->getMethod('formatValue');
-        $method->setAccessible(true);
-        $result = $method->invoke($sqlBuilder, 42);
-
-        self::assertSame('42', $result);
-    }
-
-    public function testFormatValueWithStringValue(): void
-    {
-        $qb = $this->getQueryBuilder();
-        $sqlBuilder = $qb->getDriverInstance()->getSqlBuilder($qb);
-
-        $reflection = new \ReflectionClass($sqlBuilder);
-        $method = $reflection->getMethod('formatValue');
-        $method->setAccessible(true);
-
-        /** @var string $result */
-        $result = $method->invoke($sqlBuilder, 'test');
-
-        self::assertStringContainsString("'test'", $result);
-    }
-
-    public function testFormatValueWithBooleanValue(): void
-    {
-        $qb = $this->getQueryBuilder();
-        $sqlBuilder = $qb->getDriverInstance()->getSqlBuilder($qb);
-
-        $reflection = new \ReflectionClass($sqlBuilder);
-        $method = $reflection->getMethod('formatValue');
-        $method->setAccessible(true);
-
-        /** @var string $resultTrue */
-        $resultTrue = $method->invoke($sqlBuilder, true);
-        /** @var string $resultFalse */
-        $resultFalse = $method->invoke($sqlBuilder, false);
-
-        self::assertStringContainsString("'1'", $resultTrue);
-        self::assertStringContainsString("''", $resultFalse);
     }
 
     public function testBuildInsertWithEmptyDataReturnsBaseSql(): void

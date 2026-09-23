@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace QBuilder\Tests;
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use QBuilder\Condition\ConditionBy;
 use QBuilder\Condition\ConditionJoin;
 use QBuilder\Condition\Field;
+use QBuilder\Drivers\Pgsql\PgsqlDriver;
 use QBuilder\Exceptions\MissingRequirementException;
 use QBuilder\QbConsts;
 use QBuilder\QueryBuilder;
@@ -198,6 +200,29 @@ final class PgsqlDriverTest extends TestCase
         self::assertSame($expected, $sql);
     }
 
+    /**
+     * @param non-empty-string $value
+     */
+    #[DataProvider('providePgsqlQuoteValueCases')]
+    public function testPgsqlQuoteValue(string $value, string $expected): void
+    {
+        self::assertSame($expected, (new PgsqlDriver())->quoteValue($value));
+    }
+
+    /**
+     * @return iterable<string, array{non-empty-string, string}>
+     */
+    public static function providePgsqlQuoteValueCases(): iterable
+    {
+        yield 'plain' => ['John', "'John'"];
+
+        yield 'quote is doubled' => ["O'Neil", "'O''Neil'"];
+
+        yield 'backslash uses escape string' => ['C:\dir', "E'C:\\\\dir'"];
+
+        yield 'backslash before quote' => ["a\\' OR 1=1 -- ", "E'a\\\\'' OR 1=1 -- '"];
+    }
+
     public function testPgsqlEscapeLikePattern(): void
     {
         $qb = $this->getQueryBuilder();
@@ -207,7 +232,7 @@ final class PgsqlDriverTest extends TestCase
             ->build(true)
         ;
 
-        self::assertSame('SELECT * FROM "users" WHERE ("name" LIKE \'50\\\%\')', $sql);
+        self::assertSame('SELECT * FROM "users" WHERE ("name" LIKE \'50!%%\' ESCAPE \'!\')', $sql);
     }
 
     public function testPgsqlComplexJoin(): void

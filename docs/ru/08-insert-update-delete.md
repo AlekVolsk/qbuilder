@@ -48,6 +48,30 @@ $qb->insert('users')
 // ON DUPLICATE KEY UPDATE `name` = 'John Updated', `visits` = `visits` + 1
 ```
 
+**Ссылка на вставляемое значение — `excluded()`.** Синтаксис зависит от сервера: в MySQL 8.0.20+ функция `VALUES(col)` объявлена устаревшей (предупреждение 1287), её замена — алиас строки `AS new` (MySQL 8.0.19+), которого нет в MariaDB. Билдер соединения не открывает, поэтому версию сервера передаёт вызывающий код:
+
+```php
+$qb = new QueryBuilder(QbConsts::DRIVER_PDO_MYSQL);
+$qb->setServerVersion($pdo->getAttribute(PDO::ATTR_SERVER_VERSION));
+
+$qb->insert('users')
+    ->insertRow(['email' => 'john@example.com', 'name' => 'John'])
+    ->insertConflictHandler($qb->conflictBuilder()->excluded('name'))
+    ->build();
+
+// MySQL 8.0.19+:
+// INSERT INTO `users` (`email`, `name`)
+// VALUES ('john@example.com', 'John') AS `new`
+// ON DUPLICATE KEY UPDATE `name` = `new`.`name`
+
+// MariaDB, MySQL до 8.0.19 или версия не задана:
+// INSERT INTO `users` (`email`, `name`)
+// VALUES ('john@example.com', 'John')
+// ON DUPLICATE KEY UPDATE `name` = VALUES(`name`)
+```
+
+Без версии используется `VALUES()` — он работает на всех версиях MySQL и MariaDB. Версию наследуют подзапросы (`subQuery()`).
+
 ### INSERT из подзапроса
 
 ```php

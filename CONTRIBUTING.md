@@ -30,6 +30,16 @@ Run tests:
 composer test
 ```
 
+Integration tests execute generated SQL on real databases. SQLite runs in memory whenever `pdo_sqlite` is available. MySQL/MariaDB and PostgreSQL tests are skipped unless a DSN is provided; they use temporary tables only:
+
+```bash
+QBUILDER_TEST_MYSQL_DSN='mysql:host=127.0.0.1;dbname=test;charset=utf8mb4' \
+QBUILDER_TEST_MYSQL_USER=root QBUILDER_TEST_MYSQL_PASSWORD= \
+QBUILDER_TEST_PGSQL_DSN='pgsql:host=127.0.0.1;dbname=test' \
+QBUILDER_TEST_PGSQL_USER=postgres QBUILDER_TEST_PGSQL_PASSWORD=secret \
+composer test -- --filter Integration
+```
+
 Run tests with coverage:
 
 ```bash

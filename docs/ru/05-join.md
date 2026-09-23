@@ -53,6 +53,22 @@ $qb->leftJoin('users', 'u', $condition);
 // LEFT JOIN `users` AS `u` ON (`u`.`id` = `orders`.`user_id`) AND (`u`.`status` = 'active')
 ```
 
+### Поля в условии JOIN
+
+Поле без таблицы в условии JOIN относится к присоединяемой таблице и получает её алиас (или имя таблицы, если алиаса нет) — во всех СУБД и для любых условий: `eq`, `in`, `like`, `isNull`, `between` и т.д. Поле с таблицей (`'o.user_id'`, `Field::set('user_id', 'o')`, аргумент `targetTable`) остаётся как задано; `raw()` не изменяется.
+
+```php
+$condition = ConditionJoin::create($qb, 'id', 'user_id', 'o')
+    ->and()->in('status', ['active', 'trial'])
+    ->and()->isNull('deleted_at');
+
+$qb->select('*')->from('orders', 'o')->innerJoin('users', 'u', $condition);
+
+// PostgreSQL:
+// INNER JOIN "users" AS "u" ON ("u"."id" = "o"."user_id") AND ("u"."status" IN ('active', 'trial'))
+// AND ("u"."deleted_at" IS NULL)
+```
+
 ## INNER JOIN
 
 ```php

@@ -99,6 +99,8 @@ echo $sql;  // Output SQL for inspection
 $sql = $qb->build(true);  // Removes extra spaces and line breaks
 ```
 
+Only whitespace between tokens is collapsed. String literals, quoted identifiers (`` `...` ``, `"..."`, `[...]`) and `/* ... */` comments are copied unchanged; escaping inside literals follows the dialect (including `\'` in MySQL and ClickHouse). A `-- ...` line comment keeps its line break, so it does not swallow the rest of the query.
+
 ### Checking the Query Type
 
 ```php

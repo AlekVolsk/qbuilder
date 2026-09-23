@@ -46,6 +46,8 @@ class QueryBuilder
 {
     protected string $driver = QbConsts::DRIVER_PDO_MYSQL;
     protected ?DriverInterface $driverInstance = null;
+
+    protected string $serverVersion = '';
     protected string $type = '';
     protected bool $distinctEnabled = false;
 
@@ -64,6 +66,17 @@ class QueryBuilder
     protected string $fromAlias = '';
     protected bool $fromIsSubquery = false;
     protected bool $fromFinal = false;
+
+    /** @var list<array{type:string,indexes:list<string>,for:string}> */
+    protected array $fromIndexHints = [];
+
+    /** @var array<int,list<array{type:string,indexes:list<string>,for:string}>> */
+    protected array $joinIndexHints = [];
+
+    /**
+     * Table the next index hint applies to: 'from', join position, 'subquery', or null before from().
+     */
+    protected int|string|null $indexHintTarget = null;
 
     /**
      * @var array<int,array{
@@ -176,10 +189,37 @@ class QueryBuilder
     public function getDriverInstance(): DriverInterface
     {
         if (! $this->driverInstance instanceof DriverInterface) {
-            $this->driverInstance = DriverFactory::create($this->driver);
+            $this->driverInstance = DriverFactory::create($this->driver)->setServerVersion($this->serverVersion);
         }
 
         return $this->driverInstance;
+    }
+
+    /**
+     * Set database server version to choose version-dependent syntax.
+     *
+     * Take it from the connection, e.g. PDO::ATTR_SERVER_VERSION. Subqueries inherit it.
+     * MySQL 8.0.19+ uses INSERT ... AS `new` row alias in ON DUPLICATE KEY UPDATE instead of deprecated VALUES().
+     *
+     * @param string $version Server version string, empty string for unknown
+     *
+     * @example
+     * $qb->setServerVersion($pdo->getAttribute(PDO::ATTR_SERVER_VERSION));
+     */
+    public function setServerVersion(string $version): self
+    {
+        $this->serverVersion = $version;
+        $this->driverInstance?->setServerVersion($version);
+
+        return $this;
+    }
+
+    /**
+     * Get database server version, or empty string when unknown.
+     */
+    public function getServerVersion(): string
+    {
+        return $this->serverVersion;
     }
 
     /**
@@ -194,7 +234,7 @@ class QueryBuilder
      */
     public function subQuery(): self
     {
-        return new self($this->driver);
+        return (new self($this->driver))->setServerVersion($this->serverVersion);
     }
 
     /**
@@ -258,12 +298,14 @@ class QueryBuilder
                 ? ''
                 : SqlSecurity::validateAliasName($alias, $this->driver);
             $this->fromIsSubquery = true;
+            $this->indexHintTarget = 'subquery';
         } else {
             $this->fromTable = SqlSecurity::validateTableName($table, $this->driver);
             $this->fromAlias = '' === $alias || '0' === $alias
                 ? ''
                 : SqlSecurity::validateAliasName($alias, $this->driver);
             $this->fromIsSubquery = false;
+            $this->indexHintTarget = 'from';
         }
 
         return $this;
@@ -286,6 +328,64 @@ class QueryBuilder
         $this->fromFinal = true;
 
         return $this;
+    }
+
+    /**
+     * Add USE INDEX hint to the table added last: FROM table or the last JOIN.
+     *
+     * MySQL/MariaDB: USE INDEX. MS SQL Server: not supported (throws on build).
+     * Other drivers ignore index hints, as they do not change the query result.
+     * An empty list gives USE INDEX (), which tells MySQL to use no indexes.
+     *
+     * @param array<int,string>|string $indexes Index name or names
+     * @param string                   $for     Hint scope: '' or QbConsts::INDEX_FOR_* constant
+     *
+     * @throws InvalidQueryException If there is no table to apply the hint to, or the hint is invalid
+     *
+     * @example
+     * ->from('orders', 'o')->useIndex(['idx_status', 'idx_created'])
+     */
+    public function useIndex(array|string $indexes, string $for = ''): self
+    {
+        return $this->addIndexHint(QbConsts::INDEX_USE, $indexes, $for);
+    }
+
+    /**
+     * Add FORCE INDEX hint to the table added last: FROM table or the last JOIN.
+     *
+     * MySQL/MariaDB: FORCE INDEX. MS SQL Server: WITH (INDEX(...)), without scope.
+     * Other drivers ignore index hints, as they do not change the query result.
+     *
+     * @param array<int,string>|string $indexes Index name or names
+     * @param string                   $for     Hint scope: '' or QbConsts::INDEX_FOR_* constant
+     *
+     * @throws InvalidQueryException If there is no table to apply the hint to, or the hint is invalid
+     *
+     * @example
+     * ->from('orders', 'o')->forceIndex('idx_created', QbConsts::INDEX_FOR_ORDER_BY)
+     */
+    public function forceIndex(array|string $indexes, string $for = ''): self
+    {
+        return $this->addIndexHint(QbConsts::INDEX_FORCE, $indexes, $for);
+    }
+
+    /**
+     * Add IGNORE INDEX hint to the table added last: FROM table or the last JOIN.
+     *
+     * MySQL/MariaDB: IGNORE INDEX. MS SQL Server: not supported (throws on build).
+     * Other drivers ignore index hints, as they do not change the query result.
+     *
+     * @param array<int,string>|string $indexes Index name or names
+     * @param string                   $for     Hint scope: '' or QbConsts::INDEX_FOR_* constant
+     *
+     * @throws InvalidQueryException If there is no table to apply the hint to, or the hint is invalid
+     *
+     * @example
+     * ->leftJoin('users', 'u', $condition)->ignoreIndex('idx_email')
+     */
+    public function ignoreIndex(array|string $indexes, string $for = ''): self
+    {
+        return $this->addIndexHint(QbConsts::INDEX_IGNORE, $indexes, $for);
     }
 
     /**
@@ -323,6 +423,7 @@ class QueryBuilder
             'alias' => $alias ? SqlSecurity::validateAliasName($alias, $this->driver) : '',
             'conditions' => $conditions,
         ];
+        $this->indexHintTarget = array_key_last($this->joinClauses);
 
         return $this;
     }
@@ -435,6 +536,7 @@ class QueryBuilder
             'alias' => SqlSecurity::validateAliasName($alias, $this->driver),
             'conditions' => $conditions,
         ];
+        $this->indexHintTarget = 'subquery';
 
         return $this;
     }
@@ -1121,6 +1223,24 @@ class QueryBuilder
     }
 
     /**
+     * @return list<array{type:string,indexes:list<string>,for:string}>
+     */
+    public function getFromIndexHints(): array
+    {
+        return $this->fromIndexHints;
+    }
+
+    /**
+     * @param int $position Join position in getJoinClauses()
+     *
+     * @return list<array{type:string,indexes:list<string>,for:string}>
+     */
+    public function getJoinIndexHints(int $position): array
+    {
+        return $this->joinIndexHints[$position] ?? [];
+    }
+
+    /**
      * @return array<int,array{type:string,table:string,alias:string,conditions:ConditionJoin}>
      */
     public function getJoinClauses(): array
@@ -1243,7 +1363,7 @@ class QueryBuilder
      */
     protected function validateSimpleFieldString(string $field): void
     {
-        if ('*' === $field) {
+        if ('*' === $field || Field::isIntegerLiteral($field)) {
             return;
         }
 
@@ -1257,6 +1377,71 @@ class QueryBuilder
                 "Field '{$field}' is invalid. Use Field::set() for expressions or complex field names."
             );
         }
+    }
+
+    /**
+     * Add index hint to the table added last.
+     *
+     * @param string                   $type    QbConsts::INDEX_USE, INDEX_FORCE or INDEX_IGNORE
+     * @param array<int,string>|string $indexes Index name or names
+     * @param string                   $for     Hint scope: '' or QbConsts::INDEX_FOR_* constant
+     *
+     * @throws InvalidQueryException If there is no table to apply the hint to, or the hint is invalid
+     */
+    protected function addIndexHint(string $type, array|string $indexes, string $for): self
+    {
+        if ('SELECT' !== $this->type) {
+            throw new InvalidQueryException('Index hints are supported in SELECT queries only');
+        }
+
+        if (null === $this->indexHintTarget) {
+            throw new InvalidQueryException('Index hint must follow from() or a join');
+        }
+
+        if ('subquery' === $this->indexHintTarget) {
+            throw new InvalidQueryException('Index hint cannot be applied to a subquery');
+        }
+
+        $scopes = ['', QbConsts::INDEX_FOR_JOIN, QbConsts::INDEX_FOR_ORDER_BY, QbConsts::INDEX_FOR_GROUP_BY];
+
+        if (! \in_array($for, $scopes, true)) {
+            throw new InvalidQueryException("Invalid index hint scope '{$for}'. Use QbConsts::INDEX_FOR_* constants");
+        }
+
+        $indexes = \is_string($indexes) ? [$indexes] : array_values($indexes);
+
+        if ([] === $indexes && QbConsts::INDEX_USE !== $type) {
+            throw new InvalidQueryException("{$type} INDEX requires at least one index name");
+        }
+
+        foreach ($indexes as $index) {
+            SqlSecurity::validateIdentifier($index, 'index', $this->driver);
+
+            if (str_contains($index, '.')) {
+                throw new InvalidQueryException("Invalid index name '{$index}': dots are not allowed");
+            }
+        }
+
+        $joinPosition = \is_int($this->indexHintTarget) ? $this->indexHintTarget : null;
+        $hints = null === $joinPosition ? $this->fromIndexHints : $this->joinIndexHints[$joinPosition] ?? [];
+
+        $conflicting = [QbConsts::INDEX_USE => QbConsts::INDEX_FORCE, QbConsts::INDEX_FORCE => QbConsts::INDEX_USE];
+
+        foreach ($hints as $hint) {
+            if (isset($conflicting[$type]) && $hint['type'] === $conflicting[$type]) {
+                throw new InvalidQueryException('USE INDEX and FORCE INDEX cannot be combined for one table');
+            }
+        }
+
+        $hints[] = ['type' => $type, 'indexes' => $indexes, 'for' => $for];
+
+        if (null === $joinPosition) {
+            $this->fromIndexHints = $hints;
+        } else {
+            $this->joinIndexHints[$joinPosition] = $hints;
+        }
+
+        return $this;
     }
 
     /**
@@ -1322,6 +1507,9 @@ class QueryBuilder
         $this->fromAlias = '';
         $this->fromIsSubquery = false;
         $this->fromFinal = false;
+        $this->fromIndexHints = [];
+        $this->joinIndexHints = [];
+        $this->indexHintTarget = null;
         $this->joinClauses = [];
         $this->joinFromSelectClauses = [];
 

@@ -43,15 +43,10 @@ class UnionBuilder
     protected ?int $limitValue = null;
     protected ?int $offsetValue = null;
 
-    protected SqlCompactor $compactor;
-
     /**
      * @param QueryBuilder $queryBuilder Parent QueryBuilder
      */
-    public function __construct(protected QueryBuilder $queryBuilder)
-    {
-        $this->compactor = new SqlCompactor();
-    }
+    public function __construct(protected QueryBuilder $queryBuilder) {}
 
     /**
      * Add query to UNION.
@@ -168,7 +163,7 @@ class UnionBuilder
         }
 
         if ($compact) {
-            $sql = $this->compactor->compact($sql);
+            $sql = (new SqlCompactor($this->getDriverInstance()->usesBackslashEscapes()))->compact($sql);
         }
 
         return $sql;

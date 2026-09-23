@@ -241,6 +241,24 @@ $qb->where(static fn (ConditionBuilder $q): ConditionBuilder =>
 // WHERE (`status` NOT IN ('deleted', 'banned'))
 ```
 
+### Список значений IN / NOT IN
+
+Правила одинаковы для WHERE, HAVING и JOIN:
+
+- элементы массива берутся как есть — пустая строка `''` и `null` попадают в список (`IN ('', NULL)`); тип элемента форматируется по правилам из [Безопасности](11-security.md#форматирование-значений-по-типу);
+- строка разбивается по запятой, пустые элементы отбрасываются: `in('status', 'active,,pending')` → `IN ('active', 'pending')`;
+- пустой список: `in()` → `1 = 0`, `notIn()` → `1 = 1`.
+
+`NOT IN` со значением `NULL` в списке по стандарту SQL не возвращает строк, но СУБД ведут себя по-разному — билдер передаёт `NULL` без изменений, решение за вызывающим кодом.
+
+```php
+$qb->where()
+    ->in('code', ['0012', 7, '', null])
+    ->end();
+
+// WHERE (`code` IN ('0012', 7, '', NULL))
+```
+
 ### BETWEEN
 
 **Стандартный синтаксис:**
@@ -291,7 +309,7 @@ $qb->where(static fn (ConditionBuilder $q): ConditionBuilder =>
 
 ```php
 $qb->where()
-    ->like('name', '%John%')
+    ->like('name', 'John')
     ->end();
 
 // WHERE (`name` LIKE '%John%')
@@ -301,7 +319,7 @@ $qb->where()
 
 ```php
 $qb->where(static fn (ConditionBuilder $q): ConditionBuilder =>
-    $q->like('name', '%John%')
+    $q->like('name', 'John')
 );
 
 // WHERE (`name` LIKE '%John%')
@@ -351,13 +369,23 @@ $qb->where(static fn (ConditionBuilder $q): ConditionBuilder =>
 // WHERE (`name` LIKE '%John')
 ```
 
+**Значение — буквальная строка поиска.** Символы `%` и `_` в нём экранируются, подстановочные знаки добавляет только тип границы. Для MySQL, PostgreSQL, SQLite и Oracle экранирование идёт через `!` с явным `ESCAPE '!'` — результат не зависит от `sql_mode` и `standard_conforming_strings`; в MS SQL — через `[...]`, в ClickHouse — через `\`. `ESCAPE` добавляется, только если в значении было что экранировать.
+
+```php
+$qb->where()->like('discount', '50%', QbConsts::LIKE_RIGHT)->end();
+// WHERE (`discount` LIKE '50!%%' ESCAPE '!')   — начинается с «50%»
+
+$qb->where()->like('code', 'a_b')->end();
+// WHERE (`code` LIKE '%a!_b%' ESCAPE '!')       — содержит «a_b», но не «axb»
+```
+
 ### NOT LIKE
 
 **Стандартный синтаксис:**
 
 ```php
 $qb->where()
-    ->notLike('name', '%Admin%')
+    ->notLike('name', 'Admin')
     ->end();
 
 // WHERE (`name` NOT LIKE '%Admin%')
@@ -367,7 +395,7 @@ $qb->where()
 
 ```php
 $qb->where(static fn (ConditionBuilder $q): ConditionBuilder =>
-    $q->notLike('name', '%Admin%')
+    $q->notLike('name', 'Admin')
 );
 
 // WHERE (`name` NOT LIKE '%Admin%')

@@ -136,6 +136,16 @@ class Field
     }
 
     /**
+     * Check if string is an unsigned integer literal, e.g. 1 in SELECT 1.
+     *
+     * @param string $field Field name or expression
+     */
+    public static function isIntegerLiteral(string $field): bool
+    {
+        return 1 === preg_match('/^\d+$/', $field);
+    }
+
+    /**
      * Validate field and detect if it is a SQL expression.
      * Uses permissive detection by checking all drivers to avoid false negatives.
      */
@@ -143,7 +153,7 @@ class Field
     {
         $trimmed = trim($this->name);
 
-        if ('' === $trimmed || '0' === $trimmed) {
+        if ('' === $trimmed) {
             throw new InvalidIdentifierException('Field name cannot be empty');
         }
 
@@ -172,6 +182,10 @@ class Field
     {
         if ('*' === $field) {
             return false;
+        }
+
+        if (self::isIntegerLiteral($field)) {
+            return true;
         }
 
         $drivers = QbConsts::getSupportedDrivers();
@@ -208,6 +222,10 @@ class Field
     {
         if ('*' === $field) {
             return false;
+        }
+
+        if (self::isIntegerLiteral($field)) {
+            return true;
         }
 
         $allFunctions = null !== $driver

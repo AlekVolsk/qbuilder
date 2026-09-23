@@ -111,54 +111,32 @@ abstract class Condition
 
     /**
      * IN condition: field IN (value1, value2, ...).
-     * Can be overridden in child classes for more complex logic.
      *
-     * @param Field|string         $field  Field name
-     * @param array<scalar>|string $values Array of values or comma-separated string
+     * Array elements are kept as is, including empty strings and NULL.
+     * A comma-separated string is split and its empty elements are dropped.
+     * Empty list gives an always-false condition.
+     *
+     * @param Field|string                    $field  Field name
+     * @param array<array-key,?scalar>|string $values Array of values or comma-separated string
      */
     public function in(Field|string $field, array|string $values): static
     {
-        $values = \is_array($values) ? $values : explode(',', $values);
-        $values = array_filter($values, static fn ($v) => '' !== $v);
-
-        if ([] === $values) {
-            $this->addRawCondition('1 = 0');
-
-            return $this;
-        }
-
-        $fieldName = $this->formatFieldName($field);
-        $valuesList = implode(', ', array_map(fn ($v) => $this->formatValue($v), $values));
-
-        $this->addRawCondition($fieldName.' IN ('.$valuesList.')');
-
-        return $this;
+        return $this->addInCondition($field, $values, 'IN', '1 = 0');
     }
 
     /**
      * NOT IN condition: field NOT IN (value1, value2, ...).
-     * Can be overridden in child classes for more complex logic.
      *
-     * @param Field|string         $field  Field name
-     * @param array<scalar>|string $values Array of values or comma-separated string
+     * Array elements are kept as is, including empty strings and NULL.
+     * A comma-separated string is split and its empty elements are dropped.
+     * Empty list gives an always-true condition.
+     *
+     * @param Field|string                    $field  Field name
+     * @param array<array-key,?scalar>|string $values Array of values or comma-separated string
      */
     public function notIn(Field|string $field, array|string $values): static
     {
-        $values = \is_array($values) ? $values : explode(',', $values);
-        $values = array_filter($values, static fn ($v) => '' !== $v);
-
-        if ([] === $values) {
-            $this->addRawCondition('1 = 1');
-
-            return $this;
-        }
-
-        $fieldName = $this->formatFieldName($field);
-        $valuesList = implode(', ', array_map(fn ($v) => $this->formatValue($v), $values));
-
-        $this->addRawCondition($fieldName.' NOT IN ('.$valuesList.')');
-
-        return $this;
+        return $this->addInCondition($field, $values, 'NOT IN', '1 = 1');
     }
 
     /**
@@ -170,12 +148,7 @@ abstract class Condition
      */
     public function like(Field|string $field, string $value, string $boundary = QbConsts::LIKE_FULL): static
     {
-        $driver = $this->getDriver();
-        $escapedValue = $driver->escapeLikePattern($value);
-        $finalValue = $this->applyLikeBoundary($escapedValue, $boundary);
-        $this->addCondition($field, 'LIKE', $finalValue);
-
-        return $this;
+        return $this->addLikeCondition($field, $value, $boundary, 'LIKE');
     }
 
     /**
@@ -187,12 +160,7 @@ abstract class Condition
      */
     public function notLike(Field|string $field, string $value, string $boundary = QbConsts::LIKE_FULL): static
     {
-        $driver = $this->getDriver();
-        $escapedValue = $driver->escapeLikePattern($value);
-        $finalValue = $this->applyLikeBoundary($escapedValue, $boundary);
-        $this->addCondition($field, 'NOT LIKE', $finalValue);
-
-        return $this;
+        return $this->addLikeCondition($field, $value, $boundary, 'NOT LIKE');
     }
 
     /**
@@ -631,23 +599,66 @@ abstract class Condition
     /**
      * Format value for SQL.
      *
-     * @param scalar $value Value to format
+     * @param ?scalar $value Value to format
      *
      * @return string Formatted value
      */
-    protected function formatValue(bool|float|int|string $value): string
+    protected function formatValue(bool|float|int|string|null $value): string
+    {
+        return $this->getDriver()->formatValue($value);
+    }
+
+    /**
+     * Add IN / NOT IN condition.
+     *
+     * @param Field|string                    $field          Field name
+     * @param array<array-key,?scalar>|string $values         Array of values or comma-separated string
+     * @param string                          $operator       IN or NOT IN
+     * @param string                          $emptyCondition Condition used for an empty list
+     */
+    protected function addInCondition(
+        Field|string $field,
+        array|string $values,
+        string $operator,
+        string $emptyCondition
+    ): static {
+        if (\is_string($values)) {
+            $values = array_filter(explode(',', $values), static fn (string $v): bool => '' !== $v);
+        }
+
+        if ([] === $values) {
+            $this->addRawCondition($emptyCondition);
+
+            return $this;
+        }
+
+        $valuesList = implode(', ', array_map(fn ($v): string => $this->formatValue($v), $values));
+        $this->addRawCondition($this->formatFieldName($field).' '.$operator.' ('.$valuesList.')');
+
+        return $this;
+    }
+
+    /**
+     * Add LIKE / NOT LIKE condition.
+     *
+     * The value is a literal search string: its %, _ and escape characters are escaped,
+     * then the boundary wildcards are added.
+     *
+     * @param Field|string $field    Field name
+     * @param string       $value    Search string
+     * @param string       $boundary Boundary type (LIKE_FULL, LIKE_LEFT, LIKE_RIGHT)
+     * @param string       $operator LIKE or NOT LIKE
+     */
+    protected function addLikeCondition(Field|string $field, string $value, string $boundary, string $operator): static
     {
         $driver = $this->getDriver();
+        $escapedValue = $driver->escapeLikePattern($value);
+        $pattern = $driver->quoteValue($this->applyLikeBoundary($escapedValue, $boundary));
+        $escapeClause = $escapedValue === $value ? '' : $driver->getLikeEscapeClause();
 
-        if (\is_bool($value)) {
-            return $value ? '1' : '0';
-        }
+        $this->addRawCondition($this->formatFieldName($field).' '.$operator.' '.$pattern.$escapeClause);
 
-        if (\is_int($value) || \is_float($value)) {
-            return (string) $value;
-        }
-
-        return $driver->quoteValue($value);
+        return $this;
     }
 
     /**
@@ -660,10 +671,6 @@ abstract class Condition
      */
     protected function applyLikeBoundary(string $value, string $boundary): string
     {
-        if (str_starts_with($value, '%') || str_ends_with($value, '%')) {
-            return $value;
-        }
-
         return match ($boundary) {
             QbConsts::LIKE_LEFT => '%'.$value,
             QbConsts::LIKE_RIGHT => $value.'%',

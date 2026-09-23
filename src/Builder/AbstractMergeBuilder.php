@@ -60,15 +60,7 @@ abstract class AbstractMergeBuilder extends AbstractConflictBuilder
             $valuePlaceholders = [];
 
             foreach ($insertFields as $field) {
-                $value = $row[$field] ?? null;
-
-                if (null === $value) {
-                    $valuePlaceholders[] = 'NULL';
-                } elseif (is_numeric($value)) {
-                    $valuePlaceholders[] = $value;
-                } else {
-                    $valuePlaceholders[] = $this->driver->quoteValue((string) $value);
-                }
+                $valuePlaceholders[] = $this->driver->formatValue($row[$field] ?? null);
             }
             $allRows[] = '('.implode(', ', $valuePlaceholders).')';
         }
