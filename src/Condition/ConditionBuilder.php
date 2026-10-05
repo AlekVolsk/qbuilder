@@ -22,6 +22,8 @@ use QBuilder\Services\SqlSecurity;
  *    ->in('role', ['admin', 'user'])
  *    ->like('name', 'John', QbConsts::LIKE_RIGHT) // name LIKE 'John%'
  *    ->end();
+ *
+ * @api
  */
 class ConditionBuilder extends Condition
 {
@@ -51,7 +53,7 @@ class ConditionBuilder extends Condition
         $fieldName = $this->formatFieldName($field);
         $subquerySql = $subquery->build();
 
-        $this->addRawCondition($fieldName.' IN ('.$subquerySql.')');
+        $this->addRawCondition($fieldName . ' IN (' . $subquerySql . ')');
 
         return $this;
     }
@@ -76,7 +78,7 @@ class ConditionBuilder extends Condition
         $fieldName = $this->formatFieldName($field);
         $subquerySql = $subquery->build();
 
-        $this->addRawCondition($fieldName.' NOT IN ('.$subquerySql.')');
+        $this->addRawCondition($fieldName . ' NOT IN (' . $subquerySql . ')');
 
         return $this;
     }
@@ -98,7 +100,7 @@ class ConditionBuilder extends Condition
         }
 
         $subquerySql = $subquery->build();
-        $this->addRawCondition('EXISTS ('.$subquerySql.')');
+        $this->addRawCondition('EXISTS (' . $subquerySql . ')');
 
         return $this;
     }
@@ -120,7 +122,7 @@ class ConditionBuilder extends Condition
         }
 
         $subquerySql = $subquery->build();
-        $this->addRawCondition('NOT EXISTS ('.$subquerySql.')');
+        $this->addRawCondition('NOT EXISTS (' . $subquerySql . ')');
 
         return $this;
     }
@@ -152,7 +154,7 @@ class ConditionBuilder extends Condition
         $fieldName = $this->formatFieldName($field);
         $subquerySql = $subquery->build();
 
-        $this->addRawCondition($fieldName.' '.$validatedOperator.' ('.$subquerySql.')');
+        $this->addRawCondition($fieldName . ' ' . $validatedOperator . ' (' . $subquerySql . ')');
 
         return $this;
     }

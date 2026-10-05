@@ -4,17 +4,18 @@ declare(strict_types=1);
 
 namespace QBuilder\Tests;
 
-use PHPUnit\Framework\TestCase;
 use QBuilder\Condition\Field;
 use QBuilder\Exceptions\InvalidQueryException;
 use QBuilder\QueryBuilder;
+use Testo\Assert;
+use Testo\Expect;
+use Testo\Test;
 
 /**
  * @internal
- *
- * @coversNothing
  */
-final class QueryBuilderSubqueryTest extends TestCase
+#[Test]
+final class QueryBuilderSubqueryTest
 {
     public function testSelectSubquery(): void
     {
@@ -32,11 +33,11 @@ final class QueryBuilderSubqueryTest extends TestCase
         ;
 
         $expected = 'SELECT `id`, `name`, '
-            .'(SELECT COUNT(*) FROM `orders` WHERE (`orders`.`user_id` = `users`.`id`)) '
-            .'AS `order_count` '
-            .'FROM `users`';
+            . '(SELECT COUNT(*) FROM `orders` WHERE (`orders`.`user_id` = `users`.`id`)) '
+            . 'AS `order_count` '
+            . 'FROM `users`';
 
-        self::assertSame($expected, $sql);
+        Assert::same($sql, $expected);
     }
 
     public function testWhereInSubquery(): void
@@ -56,9 +57,9 @@ final class QueryBuilderSubqueryTest extends TestCase
         ;
 
         $expected = 'SELECT * FROM `users` WHERE (`id` IN '
-            .'(SELECT `user_id` FROM `orders` WHERE (`total` >= 1000)))';
+            . '(SELECT `user_id` FROM `orders` WHERE (`total` >= 1000)))';
 
-        self::assertSame($expected, $sql);
+        Assert::same($sql, $expected);
     }
 
     public function testWhereNotInSubquery(): void
@@ -78,9 +79,9 @@ final class QueryBuilderSubqueryTest extends TestCase
         ;
 
         $expected = 'SELECT * FROM `users` WHERE (`id` NOT IN '
-            .'(SELECT `user_id` FROM `orders` WHERE (`status` = \'cancelled\')))';
+            . '(SELECT `user_id` FROM `orders` WHERE (`status` = \'cancelled\')))';
 
-        self::assertSame($expected, $sql);
+        Assert::same($sql, $expected);
     }
 
     public function testWhereExists(): void
@@ -103,9 +104,9 @@ final class QueryBuilderSubqueryTest extends TestCase
         ;
 
         $expected = 'SELECT * FROM `users` WHERE (EXISTS '
-            .'(SELECT 1 FROM `orders` WHERE (`orders`.`user_id` = `users`.`id`) AND (`total` >= 1000)))';
+            . '(SELECT 1 FROM `orders` WHERE (`orders`.`user_id` = `users`.`id`) AND (`total` >= 1000)))';
 
-        self::assertSame($expected, $sql);
+        Assert::same($sql, $expected);
     }
 
     public function testWhereNotExists(): void
@@ -125,9 +126,9 @@ final class QueryBuilderSubqueryTest extends TestCase
         ;
 
         $expected = 'SELECT * FROM `users` WHERE (NOT EXISTS '
-            .'(SELECT 1 FROM `orders` WHERE (`orders`.`user_id` = `users`.`id`)))';
+            . '(SELECT 1 FROM `orders` WHERE (`orders`.`user_id` = `users`.`id`)))';
 
-        self::assertSame($expected, $sql);
+        Assert::same($sql, $expected);
     }
 
     public function testCompareSubqueryGreaterThan(): void
@@ -147,9 +148,9 @@ final class QueryBuilderSubqueryTest extends TestCase
         ;
 
         $expected = 'SELECT * FROM `users` WHERE (`balance` > '
-            .'(SELECT AVG(`total`) FROM `orders` WHERE (`orders`.`user_id` = `users`.`id`)))';
+            . '(SELECT AVG(`total`) FROM `orders` WHERE (`orders`.`user_id` = `users`.`id`)))';
 
-        self::assertSame($expected, $sql);
+        Assert::same($sql, $expected);
     }
 
     public function testCompareSubqueryEquals(): void
@@ -165,9 +166,9 @@ final class QueryBuilderSubqueryTest extends TestCase
         ;
 
         $expected = 'SELECT * FROM `orders` WHERE (`created_at` = '
-            .'(SELECT MAX(`created_at`) FROM `orders`))';
+            . '(SELECT MAX(`created_at`) FROM `orders`))';
 
-        self::assertSame($expected, $sql);
+        Assert::same($sql, $expected);
     }
 
     public function testNestedSubqueries(): void
@@ -193,10 +194,10 @@ final class QueryBuilderSubqueryTest extends TestCase
         ;
 
         $expected = 'SELECT * FROM `departments` WHERE (`id` IN '
-            .'(SELECT `department_id` FROM `users` WHERE (`id` IN '
-            .'(SELECT `user_id` FROM `orders` WHERE (`total` >= 1000)))))';
+            . '(SELECT `department_id` FROM `users` WHERE (`id` IN '
+            . '(SELECT `user_id` FROM `orders` WHERE (`total` >= 1000)))))';
 
-        self::assertSame($expected, $sql);
+        Assert::same($sql, $expected);
     }
 
     public function testSubqueryInvalidTypeThrowsException(): void
@@ -205,8 +206,7 @@ final class QueryBuilderSubqueryTest extends TestCase
 
         $invalidSubquery = $qb->update('users')->updateRow(['status' => 'active']);
 
-        $this->expectException(InvalidQueryException::class);
-        $this->expectExceptionMessage('must be a SELECT statement');
+        Expect::exception(InvalidQueryException::class)->withMessageContaining('must be a SELECT statement');
 
         Field::subquery($invalidSubquery, 'alias');
     }
@@ -218,8 +218,7 @@ final class QueryBuilderSubqueryTest extends TestCase
         $qb2 = $qb->subQuery();
         $invalidSubquery = $qb2->delete('users')->where()->eq('id', 1)->end();
 
-        $this->expectException(InvalidQueryException::class);
-        $this->expectExceptionMessage('must be a SELECT statement');
+        Expect::exception(InvalidQueryException::class)->withMessageContaining('must be a SELECT statement');
 
         $qb->select('*')
             ->from('users')

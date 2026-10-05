@@ -12,6 +12,8 @@ use QBuilder\QueryBuilder;
  *
  * Provides common functionality for all database drivers while allowing
  * specific implementations to override behavior as needed.
+ *
+ * @internal
  */
 abstract class AbstractDriver implements DriverInterface
 {
@@ -29,14 +31,14 @@ abstract class AbstractDriver implements DriverInterface
     /**
      * Get the identifier quote character(s) for this driver.
      *
-     * @return string Quote character(s): `, ", or [
+     * @return string Quote character(s): `` ` ``, `"` or `[`
      */
     abstract public function getIdentifierQuote(): string;
 
     /**
      * Get the closing identifier quote character for this driver.
      *
-     * @return string Closing quote character: `, ", or ]
+     * @return string Closing quote character: `` ` ``, `"` or `]`
      */
     abstract public function getIdentifierCloseQuote(): string;
 
@@ -55,13 +57,6 @@ abstract class AbstractDriver implements DriverInterface
      * @return string Escaped value
      */
     abstract public function escapeValue(string $value): string;
-
-    /**
-     * Get the driver name.
-     *
-     * @return string Driver name (mysql, pgsql, sqlite, mssql, oracle, clickhouse)
-     */
-    abstract public function getName(): string;
 
     /**
      * Quote an identifier (table name, column name, etc.).
@@ -87,16 +82,16 @@ abstract class AbstractDriver implements DriverInterface
         if (str_contains($identifier, '.')) {
             $parts = explode('.', $identifier);
             $parts = array_map(
-                fn ($part): string => $quote.str_replace($quote, $escape, $this->transformIdentifier($part))
-                    .$this->getClosingQuote(),
+                fn ($part): string => $quote . str_replace($quote, $escape, $this->transformIdentifier($part))
+                    . $this->getClosingQuote(),
                 $parts
             );
 
             return implode('.', $parts);
         }
 
-        return $quote.str_replace($quote, $escape, $this->transformIdentifier($identifier))
-            .$this->getClosingQuote();
+        return $quote . str_replace($quote, $escape, $this->transformIdentifier($identifier))
+            . $this->getClosingQuote();
     }
 
     /**
@@ -114,7 +109,7 @@ abstract class AbstractDriver implements DriverInterface
         $quote = $this->getValueQuote();
         $escaped = $this->escapeValue($value);
 
-        return $quote.$escaped.$quote;
+        return $quote . $escaped . $quote;
     }
 
     public function formatValue(bool|float|int|string|null $value): string
@@ -133,7 +128,7 @@ abstract class AbstractDriver implements DriverInterface
 
         if (\is_float($value)) {
             if (! is_finite($value)) {
-                throw new InvalidQueryException('Float value must be finite, got '.var_export($value, true));
+                throw new InvalidQueryException('Float value must be finite, got ' . var_export($value, true));
             }
 
             return (string) $value;
@@ -156,12 +151,12 @@ abstract class AbstractDriver implements DriverInterface
     {
         $escape = $this->getLikeEscapeChar();
 
-        return str_replace([$escape, '%', '_'], [$escape.$escape, $escape.'%', $escape.'_'], $pattern);
+        return str_replace([$escape, '%', '_'], [$escape . $escape, $escape . '%', $escape . '_'], $pattern);
     }
 
     public function getLikeEscapeClause(): string
     {
-        return ' ESCAPE '.$this->quoteValue($this->getLikeEscapeChar());
+        return ' ESCAPE ' . $this->quoteValue($this->getLikeEscapeChar());
     }
 
     public function usesBackslashEscapes(): bool
@@ -169,6 +164,10 @@ abstract class AbstractDriver implements DriverInterface
         return false;
     }
 
+    /**
+     * @param list<array{type:string,indexes:list<string>,for:string}> $hints Index hints, ignored by default
+     */
+    // phpcs:ignore SlevomatCodingStandard.Functions.UnusedParameter -- signature from DriverInterface
     public function buildIndexHints(array $hints): string
     {
         return '';
@@ -200,6 +199,21 @@ abstract class AbstractDriver implements DriverInterface
     public function supportsUnion(): bool
     {
         return true;
+    }
+
+    public function limitRequiresOrderBy(): bool
+    {
+        return false;
+    }
+
+    public function unionTailAppliesToLastQuery(): bool
+    {
+        return false;
+    }
+
+    public function unionOperator(bool $all): string
+    {
+        return $all ? 'UNION ALL' : 'UNION';
     }
 
     /**
@@ -263,7 +277,7 @@ abstract class AbstractDriver implements DriverInterface
 
         return match ($quote) {
             '[' => ']]',
-            default => $quote.$quote,
+            default => $quote . $quote,
         };
     }
 

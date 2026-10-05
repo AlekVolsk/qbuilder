@@ -13,103 +13,45 @@ use QBuilder\Services\SqlSecurity;
  *
  * Responsible for forming final SQL from query settings
  * taking into account PostgreSQL specifics.
+ *
+ * @internal
  */
-class PgsqlSqlBuilder extends AbstractSqlBuilder
+final class PgsqlSqlBuilder extends AbstractSqlBuilder
 {
     #[\Override]
     public function buildInsert(): string
     {
-        $fromTable = $this->queryBuilder->getFromTable();
-        $sql = 'INSERT INTO '.$this->driver->quoteName($fromTable);
-
+        $sql = 'INSERT INTO ' . $this->driver->quoteName($this->queryBuilder->getFromTable());
         $insertData = $this->queryBuilder->getInsertData();
-        $insertRows = $this->queryBuilder->getInsertRows();
+
+        if (($insertData['_subquery'] ?? null) instanceof QueryBuilder) {
+            return $this->buildInsertFromSubquery($sql, $insertData['_subquery'], $insertData['_fields'] ?? []);
+        }
+
         $insertFields = $this->queryBuilder->getInsertFields();
+        $quotedFields = array_map(
+            fn (string $field): string => $this->driver->quoteName(SqlSecurity::validateFieldName($field)),
+            $insertFields
+        );
 
-        if (
-            [] !== $insertData
-            && isset($insertData['_subquery'])
-            && $insertData['_subquery'] instanceof QueryBuilder
-        ) {
-            $subQuery = $insertData['_subquery'];
-            $fields = $insertData['_fields'] ?? [];
+        $valuesSets = [];
 
-            if (! empty($fields) && \is_array($fields)) {
-                $validatedFields = array_map(
-                    fn ($f): string => $this->driver->quoteName(SqlSecurity::validateFieldName($f)),
-                    $fields
-                );
-
-                $sql .= ' ('.implode(', ', $validatedFields).')';
-            }
-
-            return $sql.("\n".$subQuery->build());
-        }
-
-        if ([] !== $insertRows) {
-            if ([] !== $insertFields) {
-                $quotedFields = array_map(
-                    fn ($field): string => $this->driver->quoteName(
-                        SqlSecurity::validateFieldName($field)
-                    ),
-                    $insertFields
-                );
-
-                $sql .= ' ('.implode(', ', $quotedFields).")\nVALUES\n";
-
-                $valuesSets = [];
-
-                foreach ($insertRows as $row) {
-                    $values = [];
-
-                    foreach ($insertFields as $field) {
-                        $values[] = $this->driver->formatValue($row[$field] ?? null);
-                    }
-                    $valuesSets[] = '('.implode(', ', $values).')';
-                }
-
-                $sql .= implode(",\n", $valuesSets);
-
-                $onConflict = $this->queryBuilder->getInsertConflictData();
-
-                if ('' !== $onConflict && '0' !== $onConflict) {
-                    $sql .= "\n".$onConflict;
-                }
-
-                return $sql;
-            }
-
-            return $sql;
-        }
-
-        if ([] !== $insertData) {
-            $fields = [];
+        foreach ($this->queryBuilder->getInsertRows() as $row) {
             $values = [];
 
-            foreach ($insertData as $field => $value) {
-                $validatedField = SqlSecurity::validateFieldName($field);
-                $fields[] = $this->driver->quoteName($validatedField);
-
-                if ($value instanceof QueryBuilder) {
-                    $values[] = '('.$value->getQuery().')';
-                } elseif (\is_array($value)) {
-                    $formatted = array_map(fn ($item): string => $this->driver->quoteValue((string) $item), $value);
-                    $values[] = '('.implode(', ', $formatted).')';
-                } else {
-                    $values[] = $this->driver->formatValue($value);
-                }
+            foreach ($insertFields as $field) {
+                $values[] = $this->driver->formatValue($row[$field] ?? null);
             }
 
-            $sql .= ' ('.implode(', ', $fields).')';
-            $sql .= "\nVALUES (".implode(', ', $values).')';
+            $valuesSets[] = '(' . implode(', ', $values) . ')';
+        }
 
-            $onConflict = $this->queryBuilder->getInsertConflictData();
+        $sql .= ' (' . implode(', ', $quotedFields) . ")\nVALUES\n" . implode(",\n", $valuesSets);
 
-            if ('' !== $onConflict && '0' !== $onConflict) {
-                $sql .= "\n".$onConflict;
-            }
+        $onConflict = $this->queryBuilder->getInsertConflictData();
 
-            return $sql;
+        if ('' !== $onConflict) {
+            $sql .= "\n" . $onConflict;
         }
 
         return $sql;
@@ -120,11 +62,7 @@ class PgsqlSqlBuilder extends AbstractSqlBuilder
     {
         $procedureName = $this->queryBuilder->getProcedureName();
 
-        if ('' === $procedureName || '0' === $procedureName) {
-            return '';
-        }
-
-        $sql = 'CALL '.$this->driver->quoteName($procedureName);
+        $sql = 'CALL ' . $this->driver->quoteName($procedureName);
 
         $params = $this->queryBuilder->getProcedureParams();
 
@@ -134,6 +72,6 @@ class PgsqlSqlBuilder extends AbstractSqlBuilder
             $formattedParams[] = $this->driver->formatValue($param);
         }
 
-        return $sql.('('.implode(', ', $formattedParams).')');
+        return $sql . ('(' . implode(', ', $formattedParams) . ')');
     }
 }

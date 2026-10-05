@@ -5,8 +5,6 @@ declare(strict_types=1);
 namespace QBuilder\Drivers\Oracle;
 
 use QBuilder\Builder\AbstractMergeBuilder;
-use QBuilder\Drivers\DriverInterface;
-use QBuilder\QueryBuilder;
 use QBuilder\Services\SqlSecurity;
 
 /**
@@ -15,75 +13,53 @@ use QBuilder\Services\SqlSecurity;
  * Oracle-specific syntax for handling duplicates on INSERT using MERGE statement.
  * Allows building complex MERGE expressions with WHEN MATCHED and WHEN NOT MATCHED.
  *
- * @example
- * // Basic MERGE
- * $builder = OracleMergeBuilder::create($qb, $driver)
- *     ->conflictTarget(['email'])
- *     ->set('name', $userName)
- *     ->set('updated_at', 'SYSDATE');
+ * MERGE is built from the rows already added to INSERT, so insertRow() goes before insertConflictHandler().
  *
- * // With increment
- * $builder = OracleMergeBuilder::create($qb, $driver)
- *     ->conflictTarget(['user_id', 'product_id'])
- *     ->increment('view_count', 1)
- *     ->sqlFunction('last_viewed', 'SYSDATE');
+ * @example
+ * $qb->insert('users')
+ *     ->insertRow(['email' => $email, 'name' => $userName, 'view_count' => 1])
+ *     ->insertConflictHandler(
+ *         $qb->conflictBuilder()
+ *             ->conflictTarget(['email'])
+ *             ->set('name', $userName)
+ *             ->increment('view_count')
+ *             ->sqlFunction('updated_at', 'SYSDATE')
+ *     );
+ *
+ * @internal
  */
-class OracleMergeBuilder extends AbstractMergeBuilder
+final class OracleMergeBuilder extends AbstractMergeBuilder
 {
-    /**
-     * Create new builder instance.
-     *
-     * @param QueryBuilder    $queryBuilder Parent QueryBuilder
-     * @param DriverInterface $driver       Oracle driver
-     */
-    public static function create(QueryBuilder $queryBuilder, DriverInterface $driver): self
-    {
-        return new self($queryBuilder, $driver);
-    }
-
     #[\Override]
     public function build(): string
     {
-        if ([] === $this->updates || [] === $this->conflictFields) {
+        if ([] === $this->updates) {
             return '';
         }
+
+        $this->assertMergeInput();
 
         $table = $this->queryBuilder->getFromTable();
         $insertRows = $this->queryBuilder->getInsertRows();
         $insertFields = $this->queryBuilder->getInsertFields();
 
-        if ([] === $insertRows || [] === $insertFields) {
-            return '';
-        }
-
         $quotedTable = $this->driver->quoteName($table);
         $sql = "MERGE INTO {$quotedTable} target\nUSING (";
 
-        if (1 === \count($insertRows)) {
-            $sql .= 'SELECT ';
-            $row = $insertRows[0];
+        $rowSelects = [];
+
+        foreach ($insertRows as $row) {
             $selects = [];
 
             foreach ($insertFields as $field) {
-                $selects[] = $this->driver->formatValue($row[$field] ?? null).' AS '
-                    .$this->driver->quoteName($field);
+                $selects[] = $this->driver->formatValue($row[$field] ?? null) . ' AS '
+                    . $this->driver->quoteName($field);
             }
-            $sql .= implode(', ', $selects).' FROM DUAL';
-        } else {
-            $allSelects = [];
 
-            foreach ($insertRows as $index => $row) {
-                $selects = [];
-
-                foreach ($insertFields as $field) {
-                    $selects[] = $this->driver->formatValue($row[$field] ?? null);
-                }
-
-                $prefix = 0 === $index ? 'SELECT ' : 'UNION ALL SELECT ';
-                $allSelects[] = $prefix.implode(', ', $selects).' FROM DUAL';
-            }
-            $sql .= implode("\n", $allSelects);
+            $rowSelects[] = 'SELECT ' . implode(', ', $selects) . ' FROM DUAL';
         }
+
+        $sql .= implode("\nUNION ALL ", $rowSelects);
 
         $sql .= ') source ON (';
 
@@ -95,7 +71,7 @@ class OracleMergeBuilder extends AbstractMergeBuilder
         }
         $sql .= implode(' AND ', $matchConditions);
 
-        $sql .= ")\nWHEN MATCHED THEN\n  UPDATE SET ".implode(', ', $this->updates);
+        $sql .= ")\nWHEN MATCHED THEN\n  UPDATE SET " . $this->buildUpdates();
 
         $insertFieldsList = [];
         $sourceFieldsList = [];
@@ -106,8 +82,8 @@ class OracleMergeBuilder extends AbstractMergeBuilder
             $sourceFieldsList[] = "source.{$quotedField}";
         }
 
-        $sql .= "\nWHEN NOT MATCHED THEN\n  INSERT (".implode(', ', $insertFieldsList).')';
-        $sql .= "\n  VALUES (".implode(', ', $sourceFieldsList).')';
+        $sql .= "\nWHEN NOT MATCHED THEN\n  INSERT (" . implode(', ', $insertFieldsList) . ')';
+        $sql .= "\n  VALUES (" . implode(', ', $sourceFieldsList) . ')';
 
         return $sql;
     }

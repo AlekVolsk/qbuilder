@@ -20,10 +20,11 @@ return $config
     ->setCacheFile(__DIR__ . '/build-dev/php-cs-fixer-cache.json')
     ->setRules([
         '@PSR12' => true,
-        '@PSR12:risky'      => true,
-        '@PhpCsFixer'       => true,
+        '@PSR12:risky' => true,
+        '@PhpCsFixer' => true,
         '@PhpCsFixer:risky' => true,
         'array_syntax' => ['syntax' => 'short'],
+        'concat_space' => ['spacing' => 'one'],
         'ordered_imports' => ['sort_algorithm' => 'alpha'],
         'no_unused_imports' => true,
         'not_operator_with_successor_space' => true,

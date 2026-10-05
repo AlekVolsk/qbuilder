@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace QBuilder\Tests;
 
-use PHPUnit\Framework\TestCase;
 use QBuilder\Builder\ConflictBuilderInterface;
 use QBuilder\Builder\RecursiveCteBuilder;
 use QBuilder\Builder\UnionBuilder;
@@ -12,67 +11,44 @@ use QBuilder\Condition\ConditionBuilder;
 use QBuilder\Condition\ConditionBy;
 use QBuilder\Condition\ConditionJoin;
 use QBuilder\Condition\Field;
-use QBuilder\Drivers\DriverInterface;
+use QBuilder\Exceptions\InvalidIdentifierException;
+use QBuilder\Exceptions\InvalidQueryException;
 use QBuilder\Exceptions\UnsupportedFeatureException;
 use QBuilder\QbConsts;
 use QBuilder\QueryBuilder;
+use Testo\Assert;
+use Testo\Data\DataProvider;
+use Testo\Expect;
+use Testo\Test;
 
 /**
  * @internal
- *
- * @coversNothing
  */
-final class QueryBuilderAdvancedTest extends TestCase
+#[Test]
+final class QueryBuilderAdvancedTest
 {
     public function testSetDriverChangesDriver(): void
     {
         $qb = new QueryBuilder();
         $qb->setDriver(QbConsts::DRIVER_POSTGRESQL);
 
-        self::assertSame(QbConsts::DRIVER_POSTGRESQL, $qb->getDriver());
+        Assert::same($qb->getDriver(), QbConsts::DRIVER_POSTGRESQL);
     }
 
     public function testSetDriverWithInvalidDriverThrowsException(): void
     {
         $qb = new QueryBuilder();
 
-        $this->expectException(UnsupportedFeatureException::class);
-        $this->expectExceptionMessage('Unsupported database driver');
+        Expect::exception(UnsupportedFeatureException::class)->withMessageContaining('Unsupported database driver');
 
         $qb->setDriver('invalid_driver');
-    }
-
-    public function testGetDriverInstanceReturnsDriverInstance(): void
-    {
-        $qb = new QueryBuilder();
-        $driver = $qb->getDriverInstance();
-
-        self::assertInstanceOf(DriverInterface::class, $driver);
-    }
-
-    public function testGetDriverInstanceCachesInstance(): void
-    {
-        $qb = new QueryBuilder();
-        $driver1 = $qb->getDriverInstance();
-        $driver2 = $qb->getDriverInstance();
-
-        self::assertSame($driver1, $driver2);
-    }
-
-    public function testGetQueryIsAliasForBuild(): void
-    {
-        $qb = new QueryBuilder();
-        $sql1 = $qb->select('*')->from('users')->getQuery(true);
-        $sql2 = $qb->select('*')->from('users')->build(true);
-
-        self::assertSame($sql1, $sql2);
     }
 
     public function testShowQueryReturnsEmptyStringForEmptyQuery(): void
     {
         $qb = new QueryBuilder();
 
-        self::assertSame('', $qb->showQuery());
+        Assert::same($qb->showQuery(), '');
     }
 
     public function testShowQueryReturnsQueryForNonEmptyQuery(): void
@@ -81,32 +57,7 @@ final class QueryBuilderAdvancedTest extends TestCase
         $qb->select('*')->from('users');
 
         $sql = $qb->showQuery();
-        self::assertStringContainsString('SELECT', $sql);
-        self::assertStringContainsString('users', $sql);
-    }
-
-    public function testGetTypeReturnsQueryType(): void
-    {
-        $qb = new QueryBuilder();
-        $qb->select('*')->from('users');
-
-        self::assertSame('SELECT', $qb->getType());
-    }
-
-    public function testGetTypeReturnsEmptyStringForEmptyQuery(): void
-    {
-        $qb = new QueryBuilder();
-
-        self::assertSame('', $qb->getType());
-    }
-
-    public function testGetDistinctEnabledReturnsCorrectValue(): void
-    {
-        $qb = new QueryBuilder();
-        self::assertFalse($qb->getDistinctEnabled());
-
-        $qb->select('*')->distinct()->from('users');
-        self::assertTrue($qb->getDistinctEnabled());
+        Assert::same($sql, "SELECT *\nFROM `users`");
     }
 
     public function testInsertFromWithSubquery(): void
@@ -125,9 +76,11 @@ final class QueryBuilderAdvancedTest extends TestCase
             ->build(true)
         ;
 
-        self::assertStringContainsString('INSERT INTO', $sql);
-        self::assertStringContainsString('SELECT', $sql);
-        self::assertStringContainsString('temp_users', $sql);
+        Assert::same(
+            $sql,
+            'INSERT INTO `users` (`name`, `email`, `age`) SELECT `name`, `email`, `age` FROM '
+                . '`temp_users` WHERE (`verified` = 1)'
+        );
     }
 
     public function testInsertFromWithoutFields(): void
@@ -143,8 +96,7 @@ final class QueryBuilderAdvancedTest extends TestCase
             ->build(true)
         ;
 
-        self::assertStringContainsString('INSERT INTO', $sql);
-        self::assertStringContainsString('SELECT', $sql);
+        Assert::same($sql, 'INSERT INTO `users` SELECT `name`, `email` FROM `temp_users`');
     }
 
     public function testUpdateFromSelectWithSubquery(): void
@@ -162,9 +114,11 @@ final class QueryBuilderAdvancedTest extends TestCase
             ->build(true)
         ;
 
-        self::assertStringContainsString('UPDATE', $sql);
-        self::assertStringContainsString('SET', $sql);
-        self::assertStringContainsString('temp_updates', $sql);
+        Assert::same(
+            $sql,
+            'UPDATE `users` SET `status` = \'verified\' WHERE `id` IN ( SELECT `user_id` FROM '
+                . '`temp_updates` WHERE (`status` = 1) )'
+        );
     }
 
     public function testDeleteFromSelectWithSubquery(): void
@@ -182,8 +136,11 @@ final class QueryBuilderAdvancedTest extends TestCase
             ->build(true)
         ;
 
-        self::assertStringContainsString('DELETE', $sql);
-        self::assertStringContainsString('temp_deletions', $sql);
+        Assert::same(
+            $sql,
+            'DELETE FROM `users` WHERE `id` IN ( SELECT `user_id` FROM `temp_deletions` WHERE '
+                . '(`status` = \'deleted\') )'
+        );
     }
 
     public function testProcedureWithoutParameters(): void
@@ -191,8 +148,8 @@ final class QueryBuilderAdvancedTest extends TestCase
         $qb = new QueryBuilder();
         $qb->procedure('get_all_users');
 
-        self::assertSame('PROCEDURE', $qb->getType());
-        self::assertSame('get_all_users', $qb->getProcedureName());
+        Assert::same($qb->getType(), 'PROCEDURE');
+        Assert::same($qb->getProcedureName(), 'get_all_users');
     }
 
     public function testProcedureWithParameters(): void
@@ -200,9 +157,9 @@ final class QueryBuilderAdvancedTest extends TestCase
         $qb = new QueryBuilder();
         $qb->procedure('get_user_by_id', [1, 'active']);
 
-        self::assertSame('PROCEDURE', $qb->getType());
-        self::assertSame('get_user_by_id', $qb->getProcedureName());
-        self::assertSame([1, 'active'], $qb->getProcedureParams());
+        Assert::same($qb->getType(), 'PROCEDURE');
+        Assert::same($qb->getProcedureName(), 'get_user_by_id');
+        Assert::same($qb->getProcedureParams(), [1, 'active']);
     }
 
     public function testUnionReturnsUnionBuilder(): void
@@ -210,7 +167,7 @@ final class QueryBuilderAdvancedTest extends TestCase
         $qb = new QueryBuilder();
         $union = $qb->union();
 
-        self::assertInstanceOf(UnionBuilder::class, $union);
+        Assert::instanceOf($union, UnionBuilder::class);
     }
 
     public function testRecursiveCteReturnsRecursiveCteBuilder(): void
@@ -218,7 +175,7 @@ final class QueryBuilderAdvancedTest extends TestCase
         $qb = new QueryBuilder();
         $cte = $qb->recursiveCte('category_tree');
 
-        self::assertInstanceOf(RecursiveCteBuilder::class, $cte);
+        Assert::instanceOf($cte, RecursiveCteBuilder::class);
     }
 
     public function testConflictBuilderReturnsConflictBuilderInterface(): void
@@ -226,15 +183,16 @@ final class QueryBuilderAdvancedTest extends TestCase
         $qb = new QueryBuilder();
         $builder = $qb->conflictBuilder();
 
-        self::assertInstanceOf(ConflictBuilderInterface::class, $builder);
+        Assert::instanceOf($builder, ConflictBuilderInterface::class);
     }
 
     public function testConflictBuilderThrowsExceptionForUnsupportedDriver(): void
     {
         $qb = new QueryBuilder(QbConsts::DRIVER_CLICKHOUSE);
 
-        $this->expectException(UnsupportedFeatureException::class);
-        $this->expectExceptionMessage('ClickHouse does not support conflict handlers');
+        Expect::exception(UnsupportedFeatureException::class)
+            ->withMessageContaining('ClickHouse does not support conflict handlers')
+        ;
 
         $qb->conflictBuilder();
     }
@@ -252,7 +210,7 @@ final class QueryBuilderAdvancedTest extends TestCase
             ->insertConflictHandler($conflictBuilder)
         ;
 
-        self::assertNotEmpty($qb->getInsertConflictData());
+        Assert::false(empty($qb->getInsertConflictData()));
     }
 
     public function testFinalForClickHouse(): void
@@ -260,7 +218,7 @@ final class QueryBuilderAdvancedTest extends TestCase
         $qb = new QueryBuilder(QbConsts::DRIVER_CLICKHOUSE);
         $qb->select('*')->from('sensor_data')->final();
 
-        self::assertTrue($qb->isFromFinal());
+        Assert::true($qb->isFromFinal());
     }
 
     public function testFinalSetsFlagForAllDrivers(): void
@@ -268,13 +226,13 @@ final class QueryBuilderAdvancedTest extends TestCase
         $qb = new QueryBuilder();
         $qb->select('*')->from('users')->final();
 
-        self::assertTrue($qb->isFromFinal());
+        Assert::true($qb->isFromFinal());
     }
 
     public function testFullJoin(): void
     {
-        $qb = new QueryBuilder();
-        $joinCondition = ConditionJoin::create($qb, 'user_id', 'id', 'users');
+        $qb = new QueryBuilder(QbConsts::DRIVER_PGSQL);
+        $joinCondition = ConditionJoin::create($qb, 'user_id', 'id', 'o');
 
         $sql = $qb->select('*')
             ->from('orders', 'o')
@@ -282,7 +240,63 @@ final class QueryBuilderAdvancedTest extends TestCase
             ->build(true)
         ;
 
-        self::assertStringContainsString('FULL JOIN', $sql);
+        Assert::same($sql, 'SELECT * FROM "orders" AS "o" FULL JOIN "users" AS "u" ON ("u"."user_id" = "o"."id")');
+    }
+
+    /**
+     * @param \Closure(QueryBuilder): QueryBuilder $addFullJoin
+     */
+    #[DataProvider('provideFullJoinIsRejectedOnMysqlCases')]
+    public function testFullJoinIsRejectedOnMysql(\Closure $addFullJoin): void
+    {
+        $qb = $addFullJoin((new QueryBuilder(QbConsts::DRIVER_PDO_MYSQL))->select('*')->from('orders', 'o'));
+
+        Expect::exception(UnsupportedFeatureException::class)->withMessageContaining('does not support FULL JOIN');
+
+        $qb->build();
+    }
+
+    /**
+     * @return iterable<string, array{\Closure(QueryBuilder): QueryBuilder}>
+     */
+    public static function provideFullJoinIsRejectedOnMysqlCases(): iterable
+    {
+        yield 'table' => [
+            static fn (QueryBuilder $qb): QueryBuilder => $qb->fullJoin(
+                'users',
+                'u',
+                ConditionJoin::create($qb, 'user_id', 'id', 'o')
+            ),
+        ];
+
+        yield 'subquery' => [
+            static fn (QueryBuilder $qb): QueryBuilder => $qb->fullJoinFromSelect(
+                $qb->subQuery()->select('id')->from('users'),
+                'u',
+                ConditionJoin::create($qb, 'user_id', 'id', 'o')
+            ),
+        ];
+    }
+
+    public function testJoinWithUnknownTypeIsRejected(): void
+    {
+        $qb = new QueryBuilder();
+        $condition = ConditionJoin::create($qb, 'user_id', 'id', 'o');
+
+        Expect::exception(InvalidQueryException::class)->withMessageContaining("Unknown JOIN type 'LEFTT'");
+
+        $qb->select('*')->from('orders', 'o')->join('users', 'u', $condition, 'LEFTT');
+    }
+
+    public function testJoinTypeIsCaseInsensitive(): void
+    {
+        $qb = new QueryBuilder();
+        $sql = $qb->select('*')->from('orders', 'o')
+            ->join('users', 'u', ConditionJoin::create($qb, 'user_id', 'id', 'o'), 'left')
+            ->build(true)
+        ;
+
+        Assert::same($sql, 'SELECT `o`.* FROM `orders` AS `o` LEFT JOIN `users` AS `u` ON (`u`.`user_id` = `o`.`id`)');
     }
 
     public function testCrossJoin(): void
@@ -296,7 +310,7 @@ final class QueryBuilderAdvancedTest extends TestCase
             ->build(true)
         ;
 
-        self::assertStringContainsString('CROSS JOIN', $sql);
+        Assert::same($sql, 'SELECT `p`.* FROM `products` AS `p` CROSS JOIN `categories` AS `c`');
     }
 
     public function testLeftJoinFromSelect(): void
@@ -315,9 +329,12 @@ final class QueryBuilderAdvancedTest extends TestCase
             ->build(true)
         ;
 
-        self::assertStringContainsString('LEFT JOIN', $sql);
-        self::assertStringContainsString('SELECT', $sql);
-        self::assertStringContainsString('order_stats', $sql);
+        Assert::same(
+            $sql,
+            'SELECT * FROM `users` LEFT JOIN (SELECT `user_id`, SUM(`total`) AS `total_spent` FROM '
+                . '`orders` GROUP BY `user_id`) AS `order_stats` ON (`order_stats`.`user_id` = '
+                . '`users`.`id`)'
+        );
     }
 
     public function testInnerJoinFromSelect(): void
@@ -336,8 +353,12 @@ final class QueryBuilderAdvancedTest extends TestCase
             ->build(true)
         ;
 
-        self::assertStringContainsString('INNER JOIN', $sql);
-        self::assertStringContainsString('price_stats', $sql);
+        Assert::same(
+            $sql,
+            'SELECT * FROM `products` INNER JOIN (SELECT `product_id`, AVG(`price`) AS `avg_price` '
+                . 'FROM `orders` GROUP BY `product_id`) AS `price_stats` ON (`price_stats`.`product_id` = '
+                . '`products`.`id`)'
+        );
     }
 
     public function testRightJoinFromSelect(): void
@@ -356,13 +377,17 @@ final class QueryBuilderAdvancedTest extends TestCase
             ->build(true)
         ;
 
-        self::assertStringContainsString('RIGHT JOIN', $sql);
-        self::assertStringContainsString('product_stats', $sql);
+        Assert::same(
+            $sql,
+            'SELECT * FROM `categories` RIGHT JOIN (SELECT `category_id`, COUNT(*) AS '
+                . '`product_count` FROM `products` GROUP BY `category_id`) AS `product_stats` ON '
+                . '(`product_stats`.`category_id` = `categories`.`id`)'
+        );
     }
 
     public function testFullJoinFromSelect(): void
     {
-        $qb = new QueryBuilder();
+        $qb = new QueryBuilder(QbConsts::DRIVER_PGSQL);
         $subquery = $qb->subQuery()
             ->select('region_id', Field::set('SUM(amount)', '', 'total_amount'))
             ->from('sales')
@@ -376,8 +401,11 @@ final class QueryBuilderAdvancedTest extends TestCase
             ->build(true)
         ;
 
-        self::assertStringContainsString('FULL JOIN', $sql);
-        self::assertStringContainsString('sales_stats', $sql);
+        Assert::same(
+            $sql,
+            'SELECT * FROM "regions" FULL JOIN (SELECT "region_id", SUM("amount") AS "total_amount" FROM "sales" '
+                . 'GROUP BY "region_id") AS "sales_stats" ON ("sales_stats"."region_id" = "regions"."id")'
+        );
     }
 
     public function testCrossJoinFromSelect(): void
@@ -395,8 +423,7 @@ final class QueryBuilderAdvancedTest extends TestCase
             ->build(true)
         ;
 
-        self::assertStringContainsString('CROSS JOIN', $sql);
-        self::assertStringContainsString('temp', $sql);
+        Assert::same($sql, 'SELECT * FROM `products` CROSS JOIN (SELECT * FROM `temp_table`) AS `temp`');
     }
 
     public function testHavingWithClosureSyntax(): void
@@ -411,8 +438,11 @@ final class QueryBuilderAdvancedTest extends TestCase
             ->build(true)
         ;
 
-        self::assertStringContainsString('HAVING', $sql);
-        self::assertStringContainsString('COUNT(*)', $sql);
+        Assert::same(
+            $sql,
+            'SELECT `status`, COUNT(*) AS `total` FROM `orders` GROUP BY `status` HAVING (COUNT(*) > '
+                . '5)'
+        );
     }
 
     public function testHavingWithStandardSyntax(): void
@@ -427,8 +457,11 @@ final class QueryBuilderAdvancedTest extends TestCase
             ->build(true)
         ;
 
-        self::assertStringContainsString('HAVING', $sql);
-        self::assertStringContainsString('COUNT(*)', $sql);
+        Assert::same(
+            $sql,
+            'SELECT `status`, COUNT(*) AS `total` FROM `orders` GROUP BY `status` HAVING (COUNT(*) > '
+                . '5)'
+        );
     }
 
     public function testHavingWithMultipleConditions(): void
@@ -445,9 +478,11 @@ final class QueryBuilderAdvancedTest extends TestCase
             ->build(true)
         ;
 
-        self::assertStringContainsString('HAVING', $sql);
-        self::assertStringContainsString('COUNT(*)', $sql);
-        self::assertStringContainsString('SUM(total)', $sql);
+        Assert::same(
+            $sql,
+            'SELECT `status`, COUNT(*) AS `total` FROM `orders` GROUP BY `status` HAVING (COUNT(*) > '
+                . '5) AND (SUM(total) < 10000)'
+        );
     }
 
     public function testFromWithSubquery(): void
@@ -464,9 +499,11 @@ final class QueryBuilderAdvancedTest extends TestCase
             ->build(true)
         ;
 
-        self::assertStringContainsString('SELECT', $sql);
-        self::assertStringContainsString('order_stats', $sql);
-        self::assertStringContainsString('orders', $sql);
+        Assert::same(
+            $sql,
+            'SELECT `order_stats`.* FROM (SELECT `user_id`, SUM(`total`) AS `total_spent` FROM '
+                . '`orders` GROUP BY `user_id`) AS `order_stats`'
+        );
     }
 
     public function testSubQueryCreatesNewQueryBuilderInstance(): void
@@ -474,8 +511,8 @@ final class QueryBuilderAdvancedTest extends TestCase
         $qb = new QueryBuilder();
         $subquery = $qb->subQuery();
 
-        self::assertInstanceOf(QueryBuilder::class, $subquery);
-        self::assertNotSame($qb, $subquery);
+        Assert::instanceOf($subquery, QueryBuilder::class);
+        Assert::notSame($subquery, $qb);
     }
 
     public function testSubQueryInheritsDriver(): void
@@ -483,171 +520,7 @@ final class QueryBuilderAdvancedTest extends TestCase
         $qb = new QueryBuilder(QbConsts::DRIVER_POSTGRESQL);
         $subquery = $qb->subQuery();
 
-        self::assertSame(QbConsts::DRIVER_POSTGRESQL, $subquery->getDriver());
-    }
-
-    public function testGetSelectFieldsReturnsSelectFields(): void
-    {
-        $qb = new QueryBuilder();
-        $qb->select('id', 'name', Field::set('email', '', 'user_email'));
-
-        $fields = $qb->getSelectFields();
-        self::assertCount(3, $fields);
-    }
-
-    public function testGetFromTableReturnsTableName(): void
-    {
-        $qb = new QueryBuilder();
-        $qb->select('*')->from('users');
-
-        self::assertSame('users', $qb->getFromTable());
-    }
-
-    public function testGetFromAliasReturnsAlias(): void
-    {
-        $qb = new QueryBuilder();
-        $qb->select('*')->from('users', 'u');
-
-        self::assertSame('u', $qb->getFromAlias());
-    }
-
-    public function testIsFromSubqueryReturnsCorrectValue(): void
-    {
-        $qb = new QueryBuilder();
-        $subquery = $qb->subQuery()->select('*')->from('temp');
-        $qb->select('*')->from($subquery, 't');
-
-        self::assertTrue($qb->isFromSubquery());
-    }
-
-    public function testGetJoinClausesReturnsJoinClauses(): void
-    {
-        $qb = new QueryBuilder();
-        $joinCondition = ConditionJoin::create($qb, 'user_id', 'id', 'users');
-        $qb->select('*')
-            ->from('orders')
-            ->leftJoin('users', 'u', $joinCondition)
-        ;
-
-        $joins = $qb->getJoinClauses();
-        self::assertCount(1, $joins);
-    }
-
-    public function testGetWhereBuilderReturnsConditionBuilder(): void
-    {
-        $qb = new QueryBuilder();
-        $qb->select('*')->from('users')->where()->eq('status', 'active')->end();
-
-        $whereBuilder = $qb->getWhereBuilder();
-        self::assertInstanceOf(ConditionBuilder::class, $whereBuilder);
-    }
-
-    public function testGetWhereBuilderReturnsNullWhenNoWhereConditions(): void
-    {
-        $qb = new QueryBuilder();
-        $qb->select('*')->from('users');
-
-        self::assertNull($qb->getWhereBuilder());
-    }
-
-    public function testGetGroupByReturnsGroupByFields(): void
-    {
-        $qb = new QueryBuilder();
-        $qb->select('status', Field::set('COUNT(*)', '', 'total'))
-            ->from('orders')
-            ->groupBy(ConditionBy::groupBy()->add('status'))
-        ;
-
-        $groupBy = $qb->getGroupBy();
-        self::assertCount(1, $groupBy);
-    }
-
-    public function testGetHavingBuilderReturnsConditionBuilder(): void
-    {
-        $qb = new QueryBuilder();
-        $qb->select('status', Field::set('COUNT(*)', '', 'total'))
-            ->from('orders')
-            ->groupBy(ConditionBy::groupBy()->add('status'))
-            ->having()
-            ->gt(Field::set('COUNT(*)'), 5)
-            ->end()
-        ;
-
-        $havingBuilder = $qb->getHavingBuilder();
-        self::assertInstanceOf(ConditionBuilder::class, $havingBuilder);
-    }
-
-    public function testGetOrderByReturnsOrderByFields(): void
-    {
-        $qb = new QueryBuilder();
-        $qb->select('*')
-            ->from('users')
-            ->orderBy(ConditionBy::orderBy()->asc('name')->desc('created_at'))
-        ;
-
-        $orderBy = $qb->getOrderBy();
-        self::assertCount(2, $orderBy);
-    }
-
-    public function testGetLimitValueReturnsLimitValue(): void
-    {
-        $qb = new QueryBuilder();
-        $qb->select('*')->from('users')->limit(10);
-
-        self::assertSame(10, $qb->getLimitValue());
-    }
-
-    public function testGetOffsetValueReturnsOffsetValue(): void
-    {
-        $qb = new QueryBuilder();
-        $qb->select('*')->from('users')->limit(10, 20);
-
-        self::assertSame(20, $qb->getOffsetValue());
-    }
-
-    public function testIsLimitWithTiesReturnsCorrectValue(): void
-    {
-        $qb = new QueryBuilder(QbConsts::DRIVER_POSTGRESQL);
-        $qb->select('*')
-            ->from('users')
-            ->orderBy(ConditionBy::orderBy()->asc('name'))
-            ->limitWithTies(10)
-        ;
-
-        self::assertTrue($qb->isLimitWithTies());
-    }
-
-    public function testGetInsertRowsReturnsInsertRows(): void
-    {
-        $qb = new QueryBuilder();
-        $qb->insert('users')
-            ->insertRow(['name' => 'John'])
-            ->insertRow(['name' => 'Jane'])
-        ;
-
-        $rows = $qb->getInsertRows();
-        self::assertCount(2, $rows);
-    }
-
-    public function testGetInsertFieldsReturnsInsertFields(): void
-    {
-        $qb = new QueryBuilder();
-        $qb->insert('users')->insertRow(['name' => 'John', 'age' => 30]);
-
-        $fields = $qb->getInsertFields();
-        self::assertCount(2, $fields);
-        self::assertContains('name', $fields);
-        self::assertContains('age', $fields);
-    }
-
-    public function testGetUpdateDataReturnsUpdateData(): void
-    {
-        $qb = new QueryBuilder();
-        $qb->update('users')->updateRow(['status' => 'active', 'name' => 'John']);
-
-        $data = $qb->getUpdateData();
-        self::assertArrayHasKey('status', $data);
-        self::assertArrayHasKey('name', $data);
+        Assert::same($subquery->getDriver(), QbConsts::DRIVER_POSTGRESQL);
     }
 
     public function testLimitWithZeroRemovesLimit(): void
@@ -655,8 +528,8 @@ final class QueryBuilderAdvancedTest extends TestCase
         $qb = new QueryBuilder();
         $qb->select('*')->from('users')->limit(10)->limit(0);
 
-        self::assertNull($qb->getLimitValue());
-        self::assertNull($qb->getOffsetValue());
+        Assert::null($qb->getLimitValue());
+        Assert::null($qb->getOffsetValue());
     }
 
     public function testLimitWithNegativeRemovesLimit(): void
@@ -664,7 +537,7 @@ final class QueryBuilderAdvancedTest extends TestCase
         $qb = new QueryBuilder();
         $qb->select('*')->from('users')->limit(10)->limit(-1);
 
-        self::assertNull($qb->getLimitValue());
+        Assert::null($qb->getLimitValue());
     }
 
     public function testLimitWithTiesWithZeroRemovesLimit(): void
@@ -677,7 +550,142 @@ final class QueryBuilderAdvancedTest extends TestCase
             ->limitWithTies(0)
         ;
 
-        self::assertNull($qb->getLimitValue());
-        self::assertFalse($qb->isLimitWithTies());
+        Assert::null($qb->getLimitValue());
+        Assert::false($qb->isLimitWithTies());
+    }
+
+    public function testRightJoin(): void
+    {
+        $qb = new QueryBuilder();
+        $sql = $qb->select('*')->from('orders', 'o')
+            ->rightJoin('users', 'u', ConditionJoin::create($qb, 'id', 'user_id', 'o'))
+            ->build(true)
+        ;
+
+        Assert::same($sql, 'SELECT `o`.* FROM `orders` AS `o` RIGHT JOIN `users` AS `u` ON (`u`.`id` = `o`.`user_id`)');
+    }
+
+    public function testCrossJoinWithoutCondition(): void
+    {
+        $sql = (new QueryBuilder())->select('*')->from('products', 'p')->crossJoin('categories', 'c')->build(true);
+
+        Assert::same($sql, 'SELECT `p`.* FROM `products` AS `p` CROSS JOIN `categories` AS `c`');
+    }
+
+    public function testCrossJoinFromSelectWithoutCondition(): void
+    {
+        $qb = new QueryBuilder();
+        $sql = $qb->select('*')->from('products')
+            ->crossJoinFromSelect($qb->subQuery()->select('id')->from('tags'), 't')
+            ->build(true)
+        ;
+
+        Assert::same($sql, 'SELECT * FROM `products` CROSS JOIN (SELECT `id` FROM `tags`) AS `t`');
+    }
+
+    public function testJoinTargetWithoutTableRefersToJoinedTable(): void
+    {
+        $qb = new QueryBuilder();
+        $sql = $qb->select('*')->from('orders', 'o')
+            ->innerJoin('users', 'u', ConditionJoin::create($qb, 'id', 'user_id'))
+            ->build(true)
+        ;
+
+        Assert::same($sql, 'SELECT `o`.* FROM `orders` AS `o` INNER JOIN `users` AS `u` ON (`u`.`id` = `u`.`user_id`)');
+    }
+
+    public function testSelectRejectsExpressionPassedAsFieldName(): void
+    {
+        Expect::exception(InvalidQueryException::class)->withMessageContaining('Use Field::set() for expressions');
+
+        (new QueryBuilder())->select('"customer" AS type');
+    }
+
+    public function testSelectWithoutFieldsSelectsAll(): void
+    {
+        Assert::same((new QueryBuilder(QbConsts::DRIVER_PGSQL))->select()->from('t')->build(true), 'SELECT * FROM "t"');
+    }
+
+    public function testReusedBuilderDropsPreviousWhereAndHaving(): void
+    {
+        $qb = new QueryBuilder();
+        $qb->select('status')->from('orders')
+            ->where()->eq('archived', 0)->end()
+            ->groupBy(ConditionBy::groupBy()->add('status'))
+            ->having()->gt(Field::set('COUNT(*)'), 1)->end()
+            ->build()
+        ;
+
+        Assert::same($qb->select('id')->from('users')->build(true), 'SELECT `id` FROM `users`');
+    }
+
+    public function testGroupByQualifiedField(): void
+    {
+        $sql = (new QueryBuilder(QbConsts::DRIVER_PGSQL))->select(Field::set('status', 'o'))->from('orders', 'o')
+            ->groupBy(ConditionBy::groupBy()->add('status', 'o'))
+            ->build(true)
+        ;
+
+        Assert::same($sql, 'SELECT "o"."status" FROM "orders" AS "o" GROUP BY "o"."status"');
+    }
+
+    public function testMysqlFieldOfFromTableIsQualifiedWithItsAlias(): void
+    {
+        $sql = (new QueryBuilder())->select(Field::set('id', 'users'))->from('users', 'u')->build(true);
+
+        Assert::same($sql, 'SELECT `u`.`id` FROM `users` AS `u`');
+    }
+
+    #[DataProvider('provideEmptySubqueryAliases')]
+    public function testFromSubqueryRequiresAlias(string $alias): void
+    {
+        $qb = new QueryBuilder();
+        $subQuery = $qb->subQuery()->select('id')->from('t');
+
+        Expect::exception(InvalidIdentifierException::class)->withMessageContaining('Empty alias name');
+
+        $qb->select('id')->from($subQuery, $alias);
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function provideEmptySubqueryAliases(): iterable
+    {
+        yield 'empty' => [''];
+        yield 'zero' => ['0'];
+    }
+
+    /**
+     * @param non-empty-string $expected
+     */
+    #[DataProvider('provideExpressionFieldsAreNotQuotedCases')]
+    public function testExpressionFieldsAreNotQuoted(string $expression, string $alias, string $expected): void
+    {
+        $sql = (new QueryBuilder(QbConsts::DRIVER_PGSQL))->select(Field::set($expression, '', $alias))
+            ->from('t')
+            ->build(true)
+        ;
+
+        Assert::same($sql, $expected);
+    }
+
+    /**
+     * @return iterable<string, array{string, string, non-empty-string}>
+     */
+    public static function provideExpressionFieldsAreNotQuotedCases(): iterable
+    {
+        yield 'arithmetic' => ['price * qty', 'total', 'SELECT price * qty AS "total" FROM "t"'];
+
+        yield 'CASE' => [
+            'CASE WHEN a > 1 THEN 1 ELSE 0 END',
+            'flag',
+            'SELECT CASE WHEN a > 1 THEN 1 ELSE 0 END AS "flag" FROM "t"',
+        ];
+    }
+
+    public function testClickhouseSelectWithoutFrom(): void
+    {
+        Assert::same((new QueryBuilder(QbConsts::DRIVER_CLICKHOUSE))->select('1')->build(true), 'SELECT 1');
     }
 }

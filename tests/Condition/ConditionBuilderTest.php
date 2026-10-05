@@ -4,18 +4,19 @@ declare(strict_types=1);
 
 namespace QBuilder\Tests;
 
-use PHPUnit\Framework\TestCase;
 use QBuilder\Condition\ConditionBuilder;
 use QBuilder\Condition\Field;
 use QBuilder\Exceptions\InvalidQueryException;
 use QBuilder\QueryBuilder;
+use Testo\Assert;
+use Testo\Expect;
+use Testo\Test;
 
 /**
  * @internal
- *
- * @coversNothing
  */
-final class ConditionBuilderTest extends TestCase
+#[Test]
+final class ConditionBuilderTest
 {
     public function testInWithArray(): void
     {
@@ -28,7 +29,7 @@ final class ConditionBuilderTest extends TestCase
             ->build(true)
         ;
 
-        self::assertStringContainsString('`role` IN (\'admin\', \'user\', \'guest\')', $sql);
+        Assert::same($sql, 'SELECT * FROM `users` WHERE (`role` IN (\'admin\', \'user\', \'guest\'))');
     }
 
     public function testInWithString(): void
@@ -42,7 +43,7 @@ final class ConditionBuilderTest extends TestCase
             ->build(true)
         ;
 
-        self::assertStringContainsString('`role` IN (\'admin\', \'user\', \'guest\')', $sql);
+        Assert::same($sql, 'SELECT * FROM `users` WHERE (`role` IN (\'admin\', \'user\', \'guest\'))');
     }
 
     public function testInWithEmptyArray(): void
@@ -56,7 +57,7 @@ final class ConditionBuilderTest extends TestCase
             ->build(true)
         ;
 
-        self::assertStringContainsString('1 = 0', $sql);
+        Assert::same($sql, 'SELECT * FROM `users` WHERE (1 = 0)');
     }
 
     public function testInWithNullValues(): void
@@ -70,8 +71,7 @@ final class ConditionBuilderTest extends TestCase
             ->build(true)
         ;
 
-        self::assertStringContainsString('NULL', $sql);
-        self::assertStringContainsString('`role` IN', $sql);
+        Assert::same($sql, 'SELECT * FROM `users` WHERE (`role` IN (\'admin\', NULL, \'user\'))');
     }
 
     public function testInWithNumericValues(): void
@@ -85,7 +85,7 @@ final class ConditionBuilderTest extends TestCase
             ->build(true)
         ;
 
-        self::assertStringContainsString('`id` IN (1, 2, 3)', $sql);
+        Assert::same($sql, 'SELECT * FROM `users` WHERE (`id` IN (1, 2, 3))');
     }
 
     public function testInWithBooleanValues(): void
@@ -99,7 +99,7 @@ final class ConditionBuilderTest extends TestCase
             ->build(true)
         ;
 
-        self::assertStringContainsString('`active` IN (1, 0)', $sql);
+        Assert::same($sql, 'SELECT * FROM `users` WHERE (`active` IN (1, 0))');
     }
 
     public function testNotInWithArray(): void
@@ -113,7 +113,7 @@ final class ConditionBuilderTest extends TestCase
             ->build(true)
         ;
 
-        self::assertStringContainsString('`role` NOT IN (\'admin\', \'user\')', $sql);
+        Assert::same($sql, 'SELECT * FROM `users` WHERE (`role` NOT IN (\'admin\', \'user\'))');
     }
 
     public function testNotInWithEmptyArray(): void
@@ -127,7 +127,7 @@ final class ConditionBuilderTest extends TestCase
             ->build(true)
         ;
 
-        self::assertStringContainsString('1 = 1', $sql);
+        Assert::same($sql, 'SELECT * FROM `users` WHERE (1 = 1)');
     }
 
     public function testInSubquery(): void
@@ -149,8 +149,11 @@ final class ConditionBuilderTest extends TestCase
             ->build(true)
         ;
 
-        self::assertStringContainsString('`id` IN (SELECT', $sql);
-        self::assertStringContainsString('FROM `orders`', $sql);
+        Assert::same(
+            $sql,
+            'SELECT * FROM `users` WHERE (`id` IN (SELECT `user_id` FROM `orders` WHERE (`status` = '
+                . '\'completed\')))'
+        );
     }
 
     public function testInSubqueryWithInvalidQueryThrowsException(): void
@@ -161,8 +164,9 @@ final class ConditionBuilderTest extends TestCase
             ->insertRow(['name' => 'John'])
         ;
 
-        $this->expectException(InvalidQueryException::class);
-        $this->expectExceptionMessage('Subquery for IN must be a SELECT statement');
+        Expect::exception(InvalidQueryException::class)
+            ->withMessageContaining('Subquery for IN must be a SELECT statement')
+        ;
 
         $qb->select('*')
             ->from('users')
@@ -191,7 +195,11 @@ final class ConditionBuilderTest extends TestCase
             ->build(true)
         ;
 
-        self::assertStringContainsString('`id` NOT IN (SELECT', $sql);
+        Assert::same(
+            $sql,
+            'SELECT * FROM `users` WHERE (`id` NOT IN (SELECT `user_id` FROM `orders` WHERE '
+                . '(`status` = \'completed\')))'
+        );
     }
 
     public function testNotInSubqueryWithInvalidQueryThrowsException(): void
@@ -202,8 +210,9 @@ final class ConditionBuilderTest extends TestCase
             ->updateRow(['name' => 'John'])
         ;
 
-        $this->expectException(InvalidQueryException::class);
-        $this->expectExceptionMessage('Subquery for NOT IN must be a SELECT statement');
+        Expect::exception(InvalidQueryException::class)
+            ->withMessageContaining('Subquery for NOT IN must be a SELECT statement')
+        ;
 
         $qb->select('*')
             ->from('users')
@@ -232,7 +241,11 @@ final class ConditionBuilderTest extends TestCase
             ->build(true)
         ;
 
-        self::assertStringContainsString('EXISTS (SELECT', $sql);
+        Assert::same(
+            $sql,
+            'SELECT * FROM `users` WHERE (EXISTS (SELECT 1 FROM `orders` WHERE (`users`.`id` = '
+                . '`orders`.`user_id`)))'
+        );
     }
 
     public function testExistsWithInvalidQueryThrowsException(): void
@@ -242,8 +255,9 @@ final class ConditionBuilderTest extends TestCase
             ->delete('orders')
         ;
 
-        $this->expectException(InvalidQueryException::class);
-        $this->expectExceptionMessage('Subquery for EXISTS must be a SELECT statement');
+        Expect::exception(InvalidQueryException::class)
+            ->withMessageContaining('Subquery for EXISTS must be a SELECT statement')
+        ;
 
         $qb->select('*')
             ->from('users')
@@ -272,7 +286,11 @@ final class ConditionBuilderTest extends TestCase
             ->build(true)
         ;
 
-        self::assertStringContainsString('NOT EXISTS (SELECT', $sql);
+        Assert::same(
+            $sql,
+            'SELECT * FROM `users` WHERE (NOT EXISTS (SELECT 1 FROM `orders` WHERE (`users`.`id` = '
+                . '`orders`.`user_id`)))'
+        );
     }
 
     public function testNotExistsWithInvalidQueryThrowsException(): void
@@ -282,8 +300,9 @@ final class ConditionBuilderTest extends TestCase
             ->delete('orders')
         ;
 
-        $this->expectException(InvalidQueryException::class);
-        $this->expectExceptionMessage('Subquery for NOT EXISTS must be a SELECT statement');
+        Expect::exception(InvalidQueryException::class)
+            ->withMessageContaining('Subquery for NOT EXISTS must be a SELECT statement')
+        ;
 
         $qb->select('*')
             ->from('users')
@@ -309,7 +328,7 @@ final class ConditionBuilderTest extends TestCase
             ->build(true)
         ;
 
-        self::assertStringContainsString('`price` = (SELECT', $sql);
+        Assert::same($sql, 'SELECT * FROM `products` WHERE (`price` = (SELECT MAX(`price`) FROM `orders`))');
     }
 
     public function testCompareSubqueryGreaterThan(): void
@@ -328,7 +347,7 @@ final class ConditionBuilderTest extends TestCase
             ->build(true)
         ;
 
-        self::assertStringContainsString('`price` > (SELECT', $sql);
+        Assert::same($sql, 'SELECT * FROM `products` WHERE (`price` > (SELECT MAX(`price`) FROM `orders`))');
     }
 
     public function testCompareSubqueryGreaterOrEqual(): void
@@ -347,7 +366,7 @@ final class ConditionBuilderTest extends TestCase
             ->build(true)
         ;
 
-        self::assertStringContainsString('`price` >= (SELECT', $sql);
+        Assert::same($sql, 'SELECT * FROM `products` WHERE (`price` >= (SELECT MAX(`price`) FROM `orders`))');
     }
 
     public function testCompareSubqueryLessOrEqual(): void
@@ -366,7 +385,7 @@ final class ConditionBuilderTest extends TestCase
             ->build(true)
         ;
 
-        self::assertStringContainsString('`price` <= (SELECT', $sql);
+        Assert::same($sql, 'SELECT * FROM `products` WHERE (`price` <= (SELECT MAX(`price`) FROM `orders`))');
     }
 
     public function testCompareSubqueryWithInvalidQueryThrowsException(): void
@@ -377,8 +396,9 @@ final class ConditionBuilderTest extends TestCase
             ->insertRow(['price' => 100])
         ;
 
-        $this->expectException(InvalidQueryException::class);
-        $this->expectExceptionMessage('Subquery for comparison must be a SELECT statement');
+        Expect::exception(InvalidQueryException::class)
+            ->withMessageContaining('Subquery for comparison must be a SELECT statement')
+        ;
 
         $qb->select('*')
             ->from('products')
@@ -401,7 +421,7 @@ final class ConditionBuilderTest extends TestCase
             ->build(true)
         ;
 
-        self::assertStringContainsString('(`status` = \'active\') AND (`age` > 18)', $sql);
+        Assert::same($sql, 'SELECT * FROM `users` WHERE (`status` = \'active\') AND (`age` > 18)');
     }
 
     public function testOr(): void
@@ -417,7 +437,7 @@ final class ConditionBuilderTest extends TestCase
             ->build(true)
         ;
 
-        self::assertStringContainsString('(`status` = \'active\') OR (`status` = \'pending\')', $sql);
+        Assert::same($sql, 'SELECT * FROM `users` WHERE (`status` = \'active\') OR (`status` = \'pending\')');
     }
 
     public function testAndGroupWithoutClosure(): void
@@ -435,9 +455,11 @@ final class ConditionBuilderTest extends TestCase
             ->build(true)
         ;
 
-        self::assertStringContainsString('(`status` = \'active\')', $sql);
-        self::assertStringContainsString('(`role` = \'admin\')', $sql);
-        self::assertStringContainsString('OR (`role` = \'moderator\')', $sql);
+        Assert::same(
+            $sql,
+            'SELECT * FROM `users` WHERE (`status` = \'active\') AND ((`role` = \'admin\') OR (`role` = '
+                . '\'moderator\'))'
+        );
     }
 
     public function testAndGroupWithClosure(): void
@@ -457,9 +479,11 @@ final class ConditionBuilderTest extends TestCase
             ->build(true)
         ;
 
-        self::assertStringContainsString('(`status` = \'active\')', $sql);
-        self::assertStringContainsString('(`role` = \'admin\')', $sql);
-        self::assertStringContainsString('OR (`role` = \'moderator\')', $sql);
+        Assert::same(
+            $sql,
+            'SELECT * FROM `users` WHERE (`status` = \'active\') AND ((`role` = \'admin\') OR (`role` = '
+                . '\'moderator\'))'
+        );
     }
 
     public function testOrGroupWithoutClosure(): void
@@ -477,9 +501,11 @@ final class ConditionBuilderTest extends TestCase
             ->build(true)
         ;
 
-        self::assertStringContainsString('(`status` = \'active\')', $sql);
-        self::assertStringContainsString('(`role` = \'admin\')', $sql);
-        self::assertStringContainsString('AND (`active` = 1)', $sql);
+        Assert::same(
+            $sql,
+            'SELECT * FROM `users` WHERE (`status` = \'active\') OR ((`role` = \'admin\') AND (`active` '
+                . '= 1))'
+        );
     }
 
     public function testOrGroupWithClosure(): void
@@ -499,9 +525,11 @@ final class ConditionBuilderTest extends TestCase
             ->build(true)
         ;
 
-        self::assertStringContainsString('(`status` = \'active\')', $sql);
-        self::assertStringContainsString('(`role` = \'admin\')', $sql);
-        self::assertStringContainsString('AND (`active` = 1)', $sql);
+        Assert::same(
+            $sql,
+            'SELECT * FROM `users` WHERE (`status` = \'active\') OR ((`role` = \'admin\') AND (`active` '
+                . '= 1))'
+        );
     }
 
     public function testEndReturnsQueryBuilder(): void
@@ -514,8 +542,8 @@ final class ConditionBuilderTest extends TestCase
             ->end()
         ;
 
-        self::assertInstanceOf(QueryBuilder::class, $returned);
-        self::assertSame($qb, $returned);
+        Assert::instanceOf($returned, QueryBuilder::class);
+        Assert::same($returned, $qb);
     }
 
     public function testReset(): void
@@ -530,8 +558,7 @@ final class ConditionBuilderTest extends TestCase
         $conditionBuilder->reset();
 
         $sql = $qb->build(true);
-        self::assertStringNotContainsString('status', $sql);
-        self::assertStringNotContainsString('age', $sql);
+        Assert::same($sql, '');
     }
 
     public function testInWithFieldObject(): void
@@ -545,7 +572,7 @@ final class ConditionBuilderTest extends TestCase
             ->build(true)
         ;
 
-        self::assertStringContainsString('`users`.`role` IN', $sql);
+        Assert::same($sql, 'SELECT * FROM `users` WHERE (`users`.`role` IN (\'admin\', \'user\'))');
     }
 
     public function testComplexNestedGroups(): void
@@ -567,8 +594,10 @@ final class ConditionBuilderTest extends TestCase
             ->build(true)
         ;
 
-        self::assertStringContainsString('(`status` = \'active\')', $sql);
-        self::assertStringContainsString('(`role` = \'admin\')', $sql);
-        self::assertStringContainsString('(`age` > 18)', $sql);
+        Assert::same(
+            $sql,
+            'SELECT * FROM `users` WHERE (`status` = \'active\') AND ((`role` = \'admin\') OR (`role` = '
+                . '\'moderator\') AND ((`age` > 18) AND (`age` < 65)))'
+        );
     }
 }

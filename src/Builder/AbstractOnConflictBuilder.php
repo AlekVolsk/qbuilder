@@ -8,12 +8,10 @@ use QBuilder\Services\SqlSecurity;
 use QBuilder\Traits\ExpressionsTrait;
 
 /**
- * Abstract base class for ON CONFLICT / ON DUPLICATE KEY builders.
+ * Base for conflict builders appended to an INSERT: conflict target, EXCLUDED reference and expressions
+ * shared by ON CONFLICT (PostgreSQL, SQLite) and ON DUPLICATE KEY UPDATE (MySQL).
  *
- * Provides common functionality for:
- * - PostgreSQL: ON CONFLICT ... DO UPDATE
- * - SQLite: ON CONFLICT ... DO UPDATE
- * - MySQL: ON DUPLICATE KEY UPDATE
+ * @internal
  */
 abstract class AbstractOnConflictBuilder extends AbstractConflictBuilder
 {
@@ -45,26 +43,9 @@ abstract class AbstractOnConflictBuilder extends AbstractConflictBuilder
         $validatedSourceField = SqlSecurity::validateFieldName($sourceField);
 
         $this->updates[] = $this->quoteField($validatedField)
-            .' = '.$this->formatExcludedReference($this->quoteField($validatedSourceField));
+            . ' = ' . $this->formatExcludedReference($this->quoteField($validatedSourceField));
 
         return $this;
-    }
-
-    /**
-     * Build final SQL.
-     */
-    public function build(): string
-    {
-        if ([] === $this->updates) {
-            return '';
-        }
-
-        $conflictClause = $this->buildConflictClause();
-        $sql = '' !== $conflictClause ? $conflictClause."\n" : "\n";
-        $sql .= $this->buildUpdatePrefix();
-        $sql .= ' '.implode(', ', $this->updates);
-
-        return $sql;
     }
 
     /**
@@ -78,20 +59,6 @@ abstract class AbstractOnConflictBuilder extends AbstractConflictBuilder
      */
     protected function formatExcludedReference(string $quotedField): string
     {
-        return 'EXCLUDED.'.$quotedField;
+        return 'EXCLUDED.' . $quotedField;
     }
-
-    /**
-     * Build the conflict clause.
-     * PostgreSQL/SQLite: ON CONFLICT (fields)
-     * MySQL: (empty, uses ON DUPLICATE KEY).
-     */
-    abstract protected function buildConflictClause(): string;
-
-    /**
-     * Build the update clause prefix.
-     * PostgreSQL/SQLite: DO UPDATE SET
-     * MySQL: ON DUPLICATE KEY UPDATE.
-     */
-    abstract protected function buildUpdatePrefix(): string;
 }

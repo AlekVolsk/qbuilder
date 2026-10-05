@@ -7,6 +7,8 @@
 **✅ ПРАВИЛЬНО:**
 
 ```php
+use QBuilder\Condition\Field;
+
 $qb->select(
     Field::set('id', 'users'),
     Field::set('name', 'users', 'user_name')
@@ -24,6 +26,9 @@ $qb->select('users.id', 'users.name AS user_name');
 **✅ ПРАВИЛЬНО:**
 
 ```php
+use QBuilder\Condition\ConditionJoin;
+use QBuilder\Condition\Field;
+
 $qb->select(
     Field::set('name', 'u', 'user_name'),
     Field::set('name', 'c', 'company_name')

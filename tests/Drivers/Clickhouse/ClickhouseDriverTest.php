@@ -4,27 +4,28 @@ declare(strict_types=1);
 
 namespace QBuilder\Tests;
 
-use PHPUnit\Framework\TestCase;
 use QBuilder\Condition\ConditionBy;
 use QBuilder\Condition\ConditionJoin;
 use QBuilder\Condition\Field;
 use QBuilder\Exceptions\UnsupportedFeatureException;
 use QBuilder\QbConsts;
 use QBuilder\QueryBuilder;
+use Testo\Assert;
+use Testo\Expect;
+use Testo\Test;
 
 /**
  * @internal
- *
- * @coversNothing
  */
-final class ClickhouseDriverTest extends TestCase
+#[Test]
+final class ClickhouseDriverTest
 {
     public function testClickhouseQuoting(): void
     {
         $qb = $this->getQueryBuilder();
         $sql = $qb->select('id', 'name')->from('users')->build(true);
 
-        self::assertSame('SELECT `id`, `name` FROM `users`', $sql);
+        Assert::same($sql, 'SELECT `id`, `name` FROM `users`');
     }
 
     public function testClickhouseLimitOffsetSyntax(): void
@@ -32,7 +33,7 @@ final class ClickhouseDriverTest extends TestCase
         $qb = $this->getQueryBuilder();
         $sql = $qb->select('*')->from('events')->limit(100, 50)->build(true);
 
-        self::assertSame('SELECT * FROM `events` LIMIT 50, 100', $sql);
+        Assert::same($sql, 'SELECT * FROM `events` LIMIT 50, 100');
     }
 
     public function testClickhouseLimitOnly(): void
@@ -40,7 +41,7 @@ final class ClickhouseDriverTest extends TestCase
         $qb = $this->getQueryBuilder();
         $sql = $qb->select('*')->from('events')->limit(100)->build(true);
 
-        self::assertSame('SELECT * FROM `events` LIMIT 100', $sql);
+        Assert::same($sql, 'SELECT * FROM `events` LIMIT 100');
     }
 
     public function testClickhouseLimitWithTies(): void
@@ -53,11 +54,8 @@ final class ClickhouseDriverTest extends TestCase
             ->build(true)
         ;
 
-        self::assertSame(
-            'SELECT `event_type`, COUNT(*) AS `total` FROM `events` '
-            .'ORDER BY `total` DESC LIMIT 5 WITH TIES',
-            $sql
-        );
+        Assert::same($sql, 'SELECT `event_type`, COUNT(*) AS `total` FROM `events` '
+        . 'ORDER BY `total` DESC LIMIT 5 WITH TIES');
     }
 
     public function testClickhouseInsertSimple(): void
@@ -68,9 +66,9 @@ final class ClickhouseDriverTest extends TestCase
         ;
 
         $expected = 'INSERT INTO `events` (`event_time`, `event_type`) '
-            ."VALUES ('2025-01-01', 'click')";
+            . "VALUES ('2025-01-01', 'click')";
 
-        self::assertSame($expected, $sql);
+        Assert::same($sql, $expected);
     }
 
     public function testClickhouseInsertMultipleRows(): void
@@ -83,9 +81,9 @@ final class ClickhouseDriverTest extends TestCase
         ;
 
         $expected = 'INSERT INTO `events` (`event_time`, `event_type`) '
-            ."VALUES ('2025-01-01', 'click'), ('2025-01-02', 'view')";
+            . "VALUES ('2025-01-01', 'click'), ('2025-01-02', 'view')";
 
-        self::assertSame($expected, $sql);
+        Assert::same($sql, $expected);
     }
 
     public function testClickhouseUpdateMutation(): void
@@ -96,18 +94,19 @@ final class ClickhouseDriverTest extends TestCase
             ->build(true)
         ;
 
-        self::assertSame('ALTER TABLE `events` UPDATE `status` = \'processed\' WHERE (`id` = 123)', $sql);
+        Assert::same($sql, 'ALTER TABLE `events` UPDATE `status` = \'processed\' WHERE (`id` = 123)');
     }
 
     public function testClickhouseUpdateWithoutWhereThrowsException(): void
     {
         $qb = $this->getQueryBuilder();
 
-        $this->expectException(UnsupportedFeatureException::class);
-        $this->expectExceptionMessage(
-            'ClickHouse ALTER TABLE UPDATE requires WHERE clause for safety. '
-            .'This is a slow mutation operation, not suitable for frequent updates.'
-        );
+        Expect::exception(UnsupportedFeatureException::class)
+            ->withMessageContaining(
+                'ClickHouse ALTER TABLE UPDATE requires WHERE clause for safety. '
+                . 'This is a slow mutation operation, not suitable for frequent updates.'
+            )
+        ;
 
         $qb->update('events')->updateRow(['status' => 'processed'])->build(true);
     }
@@ -120,18 +119,19 @@ final class ClickhouseDriverTest extends TestCase
             ->build(true)
         ;
 
-        self::assertSame("ALTER TABLE `events` DELETE WHERE (`event_time` < '2024-01-01')", $sql);
+        Assert::same($sql, "ALTER TABLE `events` DELETE WHERE (`event_time` < '2024-01-01')");
     }
 
     public function testClickhouseDeleteWithoutWhereThrowsException(): void
     {
         $qb = $this->getQueryBuilder();
 
-        $this->expectException(UnsupportedFeatureException::class);
-        $this->expectExceptionMessage(
-            'ClickHouse ALTER TABLE DELETE requires WHERE clause for safety. '
-            .'This is a slow mutation operation, not suitable for frequent deletes.'
-        );
+        Expect::exception(UnsupportedFeatureException::class)
+            ->withMessageContaining(
+                'ClickHouse ALTER TABLE DELETE requires WHERE clause for safety. '
+                . 'This is a slow mutation operation, not suitable for frequent deletes.'
+            )
+        ;
 
         $qb->delete('events')->build(true);
     }
@@ -156,12 +156,12 @@ final class ClickhouseDriverTest extends TestCase
         ;
 
         $expected = 'SELECT `e`.`id`, `e`.`event_type`, `u`.`name` '
-            .'FROM `events` AS `e` '
-            .'LEFT JOIN `users` AS `u` ON (`u`.`id` = `e`.`user_id`) '
-            ."WHERE (`e`.`event_time` >= '2025-01-01') "
-            .'LIMIT 1000';
+            . 'FROM `events` AS `e` '
+            . 'LEFT JOIN `users` AS `u` ON (`u`.`id` = `e`.`user_id`) '
+            . "WHERE (`e`.`event_time` >= '2025-01-01') "
+            . 'LIMIT 1000';
 
-        self::assertSame($expected, $sql);
+        Assert::same($sql, $expected);
     }
 
     public function testClickhouseGroupByHaving(): void
@@ -176,9 +176,9 @@ final class ClickhouseDriverTest extends TestCase
         ;
 
         $expected = 'SELECT `event_type`, COUNT(*) AS `total` FROM `events` '
-            .'GROUP BY `event_type` HAVING (COUNT(*) > 100) ORDER BY `total` DESC';
+            . 'GROUP BY `event_type` HAVING (COUNT(*) > 100) ORDER BY `total` DESC';
 
-        self::assertSame($expected, $sql);
+        Assert::same($sql, $expected);
     }
 
     public function testClickhouseSubqueryInWhere(): void
@@ -199,20 +199,21 @@ final class ClickhouseDriverTest extends TestCase
         ;
 
         $expected = 'SELECT * FROM `users` WHERE (`id` IN '
-            .'(SELECT `user_id` FROM `orders` WHERE (`total` >= 1000))) LIMIT 100';
+            . '(SELECT `user_id` FROM `orders` WHERE (`total` >= 1000))) LIMIT 100';
 
-        self::assertSame($expected, $sql);
+        Assert::same($sql, $expected);
     }
 
     public function testClickhouseConflictBuilderThrowsException(): void
     {
         $qb = $this->getQueryBuilder();
 
-        $this->expectException(UnsupportedFeatureException::class);
-        $this->expectExceptionMessage(
-            'ClickHouse does not support conflict handlers (ON DUPLICATE KEY UPDATE / ON CONFLICT). '
-            .'Use ReplacingMergeTree or CollapsingMergeTree engines for data deduplication.'
-        );
+        Expect::exception(UnsupportedFeatureException::class)
+            ->withMessageContaining(
+                'ClickHouse does not support conflict handlers (ON DUPLICATE KEY UPDATE / ON CONFLICT). '
+                . 'Use ReplacingMergeTree or CollapsingMergeTree engines for data deduplication.'
+            )
+        ;
 
         $conflictBuilder = $qb->conflictBuilder()->set('name', 'updated');
 
@@ -226,8 +227,9 @@ final class ClickhouseDriverTest extends TestCase
     {
         $qb = $this->getQueryBuilder();
 
-        $this->expectException(UnsupportedFeatureException::class);
-        $this->expectExceptionMessage('ClickHouse does not support stored procedures');
+        Expect::exception(UnsupportedFeatureException::class)
+            ->withMessageContaining('ClickHouse does not support stored procedures')
+        ;
 
         $qb->procedure('test_proc')->build(true);
     }
@@ -241,7 +243,7 @@ final class ClickhouseDriverTest extends TestCase
             ->build(true)
         ;
 
-        self::assertSame("SELECT * FROM `users` WHERE (`name` LIKE '50\\\\%%')", $sql);
+        Assert::same($sql, "SELECT * FROM `users` WHERE (`name` LIKE '50\\\\%%')");
     }
 
     public function testClickhouseDistinctQuery(): void
@@ -249,7 +251,7 @@ final class ClickhouseDriverTest extends TestCase
         $qb = $this->getQueryBuilder();
         $sql = $qb->select('event_type')->from('events')->distinct()->build(true);
 
-        self::assertSame('SELECT DISTINCT `event_type` FROM `events`', $sql);
+        Assert::same($sql, 'SELECT DISTINCT `event_type` FROM `events`');
     }
 
     public function testClickhouseDistinctMultipleFields(): void
@@ -257,7 +259,7 @@ final class ClickhouseDriverTest extends TestCase
         $qb = $this->getQueryBuilder();
         $sql = $qb->select('user_id', 'event_type')->distinct()->from('events')->build(true);
 
-        self::assertSame('SELECT DISTINCT `user_id`, `event_type` FROM `events`', $sql);
+        Assert::same($sql, 'SELECT DISTINCT `user_id`, `event_type` FROM `events`');
     }
 
     public function testClickhouseDistinctWithWhere(): void
@@ -268,7 +270,7 @@ final class ClickhouseDriverTest extends TestCase
             ->build(true)
         ;
 
-        self::assertSame('SELECT DISTINCT `user_id` FROM `events` WHERE (`status` = \'active\')', $sql);
+        Assert::same($sql, 'SELECT DISTINCT `user_id` FROM `events` WHERE (`status` = \'active\')');
     }
 
     public function testClickhouseDistinctWithOrderBy(): void
@@ -280,7 +282,7 @@ final class ClickhouseDriverTest extends TestCase
             ->build(true)
         ;
 
-        self::assertSame('SELECT DISTINCT `category` FROM `products` ORDER BY `category` ASC', $sql);
+        Assert::same($sql, 'SELECT DISTINCT `category` FROM `products` ORDER BY `category` ASC');
     }
 
     public function testClickhouseFinalModifier(): void
@@ -288,7 +290,7 @@ final class ClickhouseDriverTest extends TestCase
         $qb = $this->getQueryBuilder();
         $sql = $qb->select()->from('telemetry.sensor_data')->final()->build(true);
 
-        self::assertSame('SELECT * FROM `telemetry`.`sensor_data` FINAL', $sql);
+        Assert::same($sql, 'SELECT * FROM `telemetry`.`sensor_data` FINAL');
     }
 
     public function testClickhouseFinalWithAlias(): void
@@ -296,7 +298,7 @@ final class ClickhouseDriverTest extends TestCase
         $qb = $this->getQueryBuilder();
         $sql = $qb->select()->from('telemetry.sensor_data', 't')->final()->build(true);
 
-        self::assertSame('SELECT * FROM `telemetry`.`sensor_data` FINAL AS `t`', $sql);
+        Assert::same($sql, 'SELECT * FROM `telemetry`.`sensor_data` FINAL AS `t`');
     }
 
     public function testClickhouseFinalWithWhereAndLimit(): void
@@ -310,11 +312,8 @@ final class ClickhouseDriverTest extends TestCase
             ->build(true)
         ;
 
-        self::assertSame(
-            'SELECT `well_id`, `measure_time`, `value` FROM `telemetry`.`adku_sensor_data` FINAL '
-            .'WHERE (`well_id` = 123) LIMIT 10',
-            $sql
-        );
+        Assert::same($sql, 'SELECT `well_id`, `measure_time`, `value` FROM `telemetry`.`adku_sensor_data` FINAL '
+        . 'WHERE (`well_id` = 123) LIMIT 10');
     }
 
     public function testClickhouseFinalNotAppliedToSubquery(): void
@@ -323,7 +322,7 @@ final class ClickhouseDriverTest extends TestCase
         $subQuery = $qb->subQuery()->select('id')->from('temp_users');
         $sql = $qb->select()->from($subQuery, 'tu')->final()->build(true);
 
-        self::assertSame('SELECT * FROM (SELECT `id` FROM `temp_users`) AS `tu`', $sql);
+        Assert::same($sql, 'SELECT * FROM (SELECT `id` FROM `temp_users`) AS `tu`');
     }
 
     private function getQueryBuilder(): QueryBuilder

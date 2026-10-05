@@ -8,6 +8,8 @@ namespace QBuilder;
  * Constants for QueryBuilder and related classes.
  *
  * Centralized storage of all constants for query builder.
+ *
+ * @api
  */
 class QbConsts
 {

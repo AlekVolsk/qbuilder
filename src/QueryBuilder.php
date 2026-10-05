@@ -41,6 +41,8 @@ use QBuilder\Services\SqlSecurity;
  *
  * // Build PROCEDURE query
  * $qb->procedure('GetAllUsers')->getQuery();
+ *
+ * @api
  */
 class QueryBuilder
 {
@@ -160,7 +162,7 @@ class QueryBuilder
         if (! \in_array($driver, $supportedDrivers, true)) {
             throw new UnsupportedFeatureException(
                 "Unsupported database driver: '{$driver}'. Supported drivers: "
-                    .implode(', ', $supportedDrivers)
+                    . implode(', ', $supportedDrivers)
             );
         }
 
@@ -199,7 +201,8 @@ class QueryBuilder
      * Set database server version to choose version-dependent syntax.
      *
      * Take it from the connection, e.g. PDO::ATTR_SERVER_VERSION. Subqueries inherit it.
-     * MySQL 8.0.19+ uses INSERT ... AS `new` row alias in ON DUPLICATE KEY UPDATE instead of deprecated VALUES().
+     * MySQL 8.0.19+ uses the `` INSERT ... AS `new` `` row alias in ON DUPLICATE KEY UPDATE
+     * instead of deprecated VALUES().
      *
      * @param string $version Server version string, empty string for unknown
      *
@@ -293,10 +296,8 @@ class QueryBuilder
     public function from(self|string $table, string $alias = ''): self
     {
         if ($table instanceof self) {
-            $this->fromTable = '('.$table->build().')';
-            $this->fromAlias = '' === $alias || '0' === $alias
-                ? ''
-                : SqlSecurity::validateAliasName($alias, $this->driver);
+            $this->fromTable = '(' . $table->build() . ')';
+            $this->fromAlias = SqlSecurity::validateAliasName($alias, $this->driver);
             $this->fromIsSubquery = true;
             $this->indexHintTarget = 'subquery';
         } else {
@@ -414,13 +415,15 @@ class QueryBuilder
         $typeUpper = strtoupper($type);
 
         if (! \in_array($typeUpper, $validTypes, true)) {
-            $typeUpper = QbConsts::JOIN_INNER;
+            throw new InvalidQueryException(
+                "Unknown JOIN type '{$type}'. Use one of: " . implode(', ', $validTypes)
+            );
         }
 
         $this->joinClauses[] = [
             'type' => $typeUpper,
             'table' => SqlSecurity::validateTableName($table, $this->driver),
-            'alias' => $alias ? SqlSecurity::validateAliasName($alias, $this->driver) : '',
+            'alias' => '' !== $alias && '0' !== $alias ? SqlSecurity::validateAliasName($alias, $this->driver) : '',
             'conditions' => $conditions,
         ];
         $this->indexHintTarget = array_key_last($this->joinClauses);
@@ -1372,7 +1375,7 @@ class QueryBuilder
         $closeQuote = $driver->getIdentifierCloseQuote();
         $fieldWithoutQuotes = str_replace([$quote, $closeQuote], '', $field);
 
-        if (! preg_match('/^[a-zA-Z_][a-zA-Z0-9_]*$/', $fieldWithoutQuotes)) {
+        if (1 !== preg_match('/^[a-zA-Z_][a-zA-Z0-9_]*$/', $fieldWithoutQuotes)) {
             throw new InvalidQueryException(
                 "Field '{$field}' is invalid. Use Field::set() for expressions or complex field names."
             );

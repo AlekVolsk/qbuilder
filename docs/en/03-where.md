@@ -26,6 +26,8 @@ $qb->select('*')
 **Alternative closure syntax:**
 
 ```php
+use QBuilder\Condition\ConditionBuilder;
+
 $qb->select('*')
     ->from('users')
     ->where(static fn (ConditionBuilder $q): ConditionBuilder => $q->eq('status', 'active'));
@@ -48,6 +50,8 @@ $qb->where()
 **Alternative syntax:**
 
 ```php
+use QBuilder\Condition\ConditionBuilder;
+
 $qb->where(static fn (ConditionBuilder $q): ConditionBuilder => $q->neq('status', 'deleted'));
 
 // WHERE (`status` != 'deleted')
@@ -69,6 +73,8 @@ $qb->where()
 **Alternative syntax:**
 
 ```php
+use QBuilder\Condition\ConditionBuilder;
+
 $qb->where(static fn (ConditionBuilder $q): ConditionBuilder =>
     $q->gt('age', 18)->and()->lt('age', 65)
 );
@@ -92,6 +98,8 @@ $qb->where()
 **Alternative syntax:**
 
 ```php
+use QBuilder\Condition\ConditionBuilder;
+
 $qb->where(static fn (ConditionBuilder $q): ConditionBuilder =>
     $q->gte('price', 100)->and()->lte('price', 1000)
 );
@@ -118,6 +126,8 @@ $qb->where()
 **Alternative syntax:**
 
 ```php
+use QBuilder\Condition\ConditionBuilder;
+
 $qb->where(static fn (ConditionBuilder $q): ConditionBuilder =>
     $q->eq('status', 'active')
       ->and()->eq('verified', 1)
@@ -143,6 +153,8 @@ $qb->where()
 **Alternative syntax:**
 
 ```php
+use QBuilder\Condition\ConditionBuilder;
+
 $qb->where(static fn (ConditionBuilder $q): ConditionBuilder =>
     $q->eq('status', 'active')->or()->eq('status', 'pending')
 );
@@ -184,6 +196,8 @@ $qb->where()
 **Alternative closure syntax:**
 
 ```php
+use QBuilder\Condition\ConditionBuilder;
+
 $qb->where(static fn (ConditionBuilder $q): ConditionBuilder =>
     $q->eq('country', 'US')
       ->andGroup(static fn (ConditionBuilder $q2): ConditionBuilder => $q2
@@ -212,6 +226,8 @@ $qb->where()
 **Alternative syntax:**
 
 ```php
+use QBuilder\Condition\ConditionBuilder;
+
 $qb->where(static fn (ConditionBuilder $q): ConditionBuilder =>
     $q->in('status', ['active', 'pending', 'verified'])
 );
@@ -234,6 +250,8 @@ $qb->where()
 **Alternative syntax:**
 
 ```php
+use QBuilder\Condition\ConditionBuilder;
+
 $qb->where(static fn (ConditionBuilder $q): ConditionBuilder =>
     $q->notIn('status', ['deleted', 'banned'])
 );
@@ -249,7 +267,7 @@ The rules are the same for WHERE, HAVING and JOIN:
 - a string is split by commas and empty elements are dropped: `in('status', 'active,,pending')` → `IN ('active', 'pending')`;
 - an empty list gives `1 = 0` for `in()` and `1 = 1` for `notIn()`.
 
-Per the SQL standard, `NOT IN` with `NULL` in the list returns no rows, but databases differ — the builder passes `NULL` through unchanged and leaves the decision to the calling code.
+**`NOT IN` with `NULL` in the list never matches.** `id NOT IN (1, NULL)` is never true, so the query returns no rows at all — checked on MySQL, PostgreSQL and SQLite. The builder passes `NULL` through unchanged; drop `null` from a `notIn()` list unless an empty result is what you want, and add `isNull()` explicitly when rows with `NULL` must be kept.
 
 ```php
 $qb->where()
@@ -274,6 +292,8 @@ $qb->where()
 **Alternative syntax:**
 
 ```php
+use QBuilder\Condition\ConditionBuilder;
+
 $qb->where(static fn (ConditionBuilder $q): ConditionBuilder =>
     $q->between('age', 18, 65)
 );
@@ -296,6 +316,8 @@ $qb->where()
 **Alternative syntax:**
 
 ```php
+use QBuilder\Condition\ConditionBuilder;
+
 $qb->where(static fn (ConditionBuilder $q): ConditionBuilder =>
     $q->notBetween('age', 18, 65)
 );
@@ -318,6 +340,8 @@ $qb->where()
 **Alternative syntax:**
 
 ```php
+use QBuilder\Condition\ConditionBuilder;
+
 $qb->where(static fn (ConditionBuilder $q): ConditionBuilder =>
     $q->like('name', 'John')
 );
@@ -348,6 +372,7 @@ $qb->where()->like('name', 'John', QbConsts::LIKE_LEFT)->end();
 **Alternative syntax:**
 
 ```php
+use QBuilder\Condition\ConditionBuilder;
 use QBuilder\QbConsts;
 
 // Contains (default)
@@ -372,6 +397,8 @@ $qb->where(static fn (ConditionBuilder $q): ConditionBuilder =>
 **The value is a literal search string.** `%` and `_` in it are escaped; wildcards are added only by the boundary type. MySQL, PostgreSQL, SQLite and Oracle escape with `!` and an explicit `ESCAPE '!'`, so the result does not depend on `sql_mode` or `standard_conforming_strings`; MS SQL uses `[...]`, ClickHouse uses `\`. `ESCAPE` is appended only when the value contained something to escape.
 
 ```php
+use QBuilder\QbConsts;
+
 $qb->where()->like('discount', '50%', QbConsts::LIKE_RIGHT)->end();
 // WHERE (`discount` LIKE '50!%%' ESCAPE '!')   — starts with "50%"
 
@@ -394,6 +421,8 @@ $qb->where()
 **Alternative syntax:**
 
 ```php
+use QBuilder\Condition\ConditionBuilder;
+
 $qb->where(static fn (ConditionBuilder $q): ConditionBuilder =>
     $q->notLike('name', 'Admin')
 );
@@ -417,6 +446,8 @@ $qb->where()
 **Alternative syntax:**
 
 ```php
+use QBuilder\Condition\ConditionBuilder;
+
 $qb->where(static fn (ConditionBuilder $q): ConditionBuilder =>
     $q->isNull('deleted_at')->and()->isNotNull('email')
 );
@@ -441,6 +472,8 @@ $qb->where()
 **Alternative syntax:**
 
 ```php
+use QBuilder\Condition\ConditionBuilder;
+
 $qb->where(static fn (ConditionBuilder $q): ConditionBuilder =>
     $q->eqField('orders', 'user_id', 'users', 'id')
 );
@@ -464,6 +497,8 @@ $qb->where()
 **Alternative syntax:**
 
 ```php
+use QBuilder\Condition\ConditionBuilder;
+
 $qb->where(static fn (ConditionBuilder $q): ConditionBuilder =>
     $q->gtField('orders', 'total', 'users', 'credit_limit')
       ->and()
@@ -490,6 +525,8 @@ $qb->where()
 **Alternative syntax:**
 
 ```php
+use QBuilder\Condition\ConditionBuilder;
+
 $qb->where(static fn (ConditionBuilder $q): ConditionBuilder => $q->bitmask('permissions', [1 => 1, 2 => 1, 4 => 0]));
 
 // WHERE ((`permissions` & 1 = 1)) AND ((`permissions` & 2 = 2)) AND ((`permissions` & 4 = 0))
@@ -510,6 +547,8 @@ $qb->where()
 **Alternative syntax:**
 
 ```php
+use QBuilder\Condition\ConditionBuilder;
+
 $qb->where(static fn (ConditionBuilder $q): ConditionBuilder =>
     $q->notBitmask('permissions', [8 => 1])
 );
@@ -538,6 +577,8 @@ $qb->where()
 **Alternative syntax:**
 
 ```php
+use QBuilder\Condition\ConditionBuilder;
+
 $qb->where(static fn (ConditionBuilder $q): ConditionBuilder =>
     $q->findInSet('tags', 'admin')
 );
@@ -570,6 +611,8 @@ $qb->where()
 **Alternative syntax:**
 
 ```php
+use QBuilder\Condition\ConditionBuilder;
+
 $qb->where(static fn (ConditionBuilder $q): ConditionBuilder =>
     $q->eq('status', 'active')->and()->raw('YEAR(created_at) = 2024')
 );

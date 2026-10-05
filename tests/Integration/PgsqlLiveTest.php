@@ -4,11 +4,12 @@ declare(strict_types=1);
 
 namespace QBuilder\Tests\Integration;
 
-use PHPUnit\Framework\Attributes\DataProvider;
-use PHPUnit\Framework\Attributes\RequiresPhpExtension;
-use PHPUnit\Framework\TestCase;
 use QBuilder\QbConsts;
 use QBuilder\QueryBuilder;
+use Testo\Assert;
+use Testo\Core\Exception\SkipTest;
+use Testo\Data\DataProvider;
+use Testo\Test;
 
 /**
  * Executes generated SQL on a live PostgreSQL server.
@@ -17,11 +18,9 @@ use QBuilder\QueryBuilder;
  * QBUILDER_TEST_PGSQL_PASSWORD are optional. Uses temporary tables only.
  *
  * @internal
- *
- * @coversNothing
  */
-#[RequiresPhpExtension('pdo_pgsql')]
-final class PgsqlLiveTest extends TestCase
+#[Test]
+final class PgsqlLiveTest
 {
     private const string MODE_DEFAULT = 'SET standard_conforming_strings = on';
 
@@ -36,7 +35,7 @@ final class PgsqlLiveTest extends TestCase
             ->build()
         ;
 
-        self::assertSame([], $this->column($pdo, $sql));
+        Assert::same($this->column($pdo, $sql), []);
     }
 
     #[DataProvider('provideStringModes')]
@@ -53,8 +52,8 @@ final class PgsqlLiveTest extends TestCase
             ->build()
         ;
 
-        self::assertSame(['50%'], $this->column($pdo, $percent));
-        self::assertSame(['a_b'], $this->column($pdo, $underscore));
+        Assert::same($this->column($pdo, $percent), ['50%']);
+        Assert::same($this->column($pdo, $underscore), ['a_b']);
     }
 
     /**
@@ -79,7 +78,7 @@ final class PgsqlLiveTest extends TestCase
 
             $sql = $this->builder()->select('name')->from('t')->where()->eq('name', $value)->end()->build();
 
-            self::assertSame([$value], $this->column($pdo, $sql), $stringMode);
+            Assert::same($this->column($pdo, $sql), [$value], $stringMode);
         }
     }
 
@@ -99,6 +98,8 @@ final class PgsqlLiveTest extends TestCase
         yield 'control characters' => ["a\nb\rc\td\x1ae"];
 
         yield 'unicode' => ['Привет, 世界'];
+
+        yield '4-byte emoji' => ['ok 😀'];
     }
 
     public function testNumericLookingStringsAndBoolAreStoredAsIs(): void
@@ -112,20 +113,24 @@ final class PgsqlLiveTest extends TestCase
         );
 
         $statement = $pdo->query('SELECT inn, code, active, qty FROM org');
-        self::assertNotFalse($statement);
+        Assert::instanceOf($statement, \PDOStatement::class);
 
-        self::assertSame(
-            ['inn' => '0123456789', 'code' => '1e3', 'active' => false, 'qty' => 5],
-            $statement->fetch(\PDO::FETCH_ASSOC)
+        Assert::same(
+            $statement->fetch(\PDO::FETCH_ASSOC),
+            ['inn' => '0123456789', 'code' => '1e3', 'active' => false, 'qty' => 5]
         );
     }
 
     private function connection(string $stringMode): \PDO
     {
+        if (! \extension_loaded('pdo_pgsql')) {
+            throw new SkipTest('pdo_pgsql extension is not loaded');
+        }
+
         $dsn = getenv('QBUILDER_TEST_PGSQL_DSN');
 
         if (false === $dsn || '' === $dsn) {
-            self::markTestSkipped('QBUILDER_TEST_PGSQL_DSN is not set');
+            throw new SkipTest('QBUILDER_TEST_PGSQL_DSN is not set');
         }
 
         $user = getenv('QBUILDER_TEST_PGSQL_USER');
@@ -158,12 +163,12 @@ final class PgsqlLiveTest extends TestCase
     private function column(\PDO $pdo, string $sql): array
     {
         $statement = $pdo->query($sql);
-        self::assertNotFalse($statement);
+        Assert::instanceOf($statement, \PDOStatement::class);
 
         $values = [];
 
         foreach ($statement->fetchAll(\PDO::FETCH_COLUMN) as $value) {
-            self::assertIsString($value);
+            Assert::string($value);
             $values[] = $value;
         }
 

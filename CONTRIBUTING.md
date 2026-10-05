@@ -37,21 +37,30 @@ QBUILDER_TEST_MYSQL_DSN='mysql:host=127.0.0.1;dbname=test;charset=utf8mb4' \
 QBUILDER_TEST_MYSQL_USER=root QBUILDER_TEST_MYSQL_PASSWORD= \
 QBUILDER_TEST_PGSQL_DSN='pgsql:host=127.0.0.1;dbname=test' \
 QBUILDER_TEST_PGSQL_USER=postgres QBUILDER_TEST_PGSQL_PASSWORD=secret \
-composer test -- --filter Integration
+composer test:integration
 ```
 
-Run tests with coverage:
+Tests run on [Testo](https://php-testo.github.io): a test class carries the `#[Test]` attribute and asserts with `Testo\Assert` / `Testo\Expect`. Run a single suite with `composer test:unit` or `composer test:integration`.
+
+Collect coverage into a Clover report (`build-dev/coverage/clover.xml`, requires PCOV or Xdebug):
 
 ```bash
-composer test:coverage
+composer test:coverage-clover
 ```
 
 ## Static Analysis
 
-We use PHPStan for static analysis. Ensure your code passes:
+We use PHPStan (max level with strict rules, disallowed calls and dead code detection) and PHP_CodeSniffer (PSR-12, Slevomat, PHPCompatibility). Ensure your code passes:
 
 ```bash
 composer phpstan
+composer phpcs
+```
+
+Run all checks at once:
+
+```bash
+composer lint
 ```
 
 ## Pull Request Process

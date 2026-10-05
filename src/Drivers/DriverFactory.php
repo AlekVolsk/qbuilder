@@ -17,8 +17,10 @@ use QBuilder\QbConsts;
  * Factory for creating database drivers.
  *
  * Automatically selects and creates the appropriate driver based on database type.
+ *
+ * @internal
  */
-class DriverFactory
+final class DriverFactory
 {
     /**
      * Create driver for specified database type.
@@ -44,36 +46,8 @@ class DriverFactory
 
             default => throw new UnsupportedFeatureException(
                 "Unsupported database driver: '{$driverType}'. Supported drivers: "
-                    .implode(', ', QbConsts::getSupportedDrivers())
+                    . implode(', ', QbConsts::getSupportedDrivers())
             ),
         };
-    }
-
-    /**
-     * Check if driver is supported.
-     *
-     * @param string $driverType Driver type
-     *
-     * @example
-     * if (DriverFactory::isSupported(QbConsts::DRIVER_PDO_MYSQL)) {
-     *     // driver is supported
-     * }
-     */
-    public static function isSupported(string $driverType): bool
-    {
-        return \in_array($driverType, QbConsts::getSupportedDrivers(), true);
-    }
-
-    /**
-     * Get list of supported drivers.
-     *
-     * @return array<string> List of driver types
-     *
-     * @example
-     * $supported = DriverFactory::getSupportedDrivers();
-     */
-    public static function getSupportedDrivers(): array
-    {
-        return QbConsts::getSupportedDrivers();
     }
 }

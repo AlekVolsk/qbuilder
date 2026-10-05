@@ -4,17 +4,18 @@ declare(strict_types=1);
 
 namespace QBuilder\Tests;
 
-use PHPUnit\Framework\TestCase;
 use QBuilder\Exceptions\InvalidIdentifierException;
 use QBuilder\QbConsts;
 use QBuilder\QueryBuilder;
+use Testo\Assert;
+use Testo\Expect;
+use Testo\Test;
 
 /**
  * @internal
- *
- * @coversNothing
  */
-final class PgsqlSqlBuilderTest extends TestCase
+#[Test]
+final class PgsqlSqlBuilderTest
 {
     public function testBuildInsertWithInsertRows(): void
     {
@@ -26,10 +27,7 @@ final class PgsqlSqlBuilderTest extends TestCase
 
         $sql = $qb->build(true);
 
-        self::assertStringContainsString('INSERT INTO', $sql);
-        self::assertStringContainsString('VALUES', $sql);
-        self::assertStringContainsString('John', $sql);
-        self::assertStringContainsString('Jane', $sql);
+        Assert::same($sql, 'INSERT INTO "users" ("name", "age") VALUES (\'John\', 30), (\'Jane\', 25)');
     }
 
     public function testBuildInsertWithInsertFromSubquery(): void
@@ -49,9 +47,11 @@ final class PgsqlSqlBuilderTest extends TestCase
 
         $sql = $qb->build(true);
 
-        self::assertStringContainsString('INSERT INTO', $sql);
-        self::assertStringContainsString('SELECT', $sql);
-        self::assertStringContainsString('temp_users', $sql);
+        Assert::same(
+            $sql,
+            'INSERT INTO "users" ("name", "age") SELECT "name", "age" FROM "temp_users" WHERE '
+                . '("verified" = 1)'
+        );
     }
 
     public function testBuildInsertWithInsertFromSubqueryWithoutFields(): void
@@ -68,8 +68,7 @@ final class PgsqlSqlBuilderTest extends TestCase
 
         $sql = $qb->build(true);
 
-        self::assertStringContainsString('INSERT INTO', $sql);
-        self::assertStringContainsString('SELECT', $sql);
+        Assert::same($sql, 'INSERT INTO "users" SELECT "name", "age" FROM "temp_users"');
     }
 
     public function testBuildInsertWithOnConflictHandler(): void
@@ -88,9 +87,11 @@ final class PgsqlSqlBuilderTest extends TestCase
 
         $sql = $qb->build(true);
 
-        self::assertStringContainsString('INSERT INTO', $sql);
-        self::assertStringContainsString('ON CONFLICT', $sql);
-        self::assertStringContainsString('DO UPDATE SET', $sql);
+        Assert::same(
+            $sql,
+            'INSERT INTO "users" ("email", "name", "views") VALUES (\'test@example.com\', \'Test\', 0) '
+                . 'ON CONFLICT ("email") DO UPDATE SET "name" = \'Updated\', "views" = "users"."views" + 1'
+        );
     }
 
     public function testBuildProcedureWithoutParameters(): void
@@ -100,9 +101,7 @@ final class PgsqlSqlBuilderTest extends TestCase
 
         $sql = $qb->build(true);
 
-        self::assertStringContainsString('CALL', $sql);
-        self::assertStringContainsString('get_all_users', $sql);
-        self::assertStringContainsString('()', $sql);
+        Assert::same($sql, 'CALL "get_all_users"()');
     }
 
     public function testBuildProcedureWithParameters(): void
@@ -112,10 +111,7 @@ final class PgsqlSqlBuilderTest extends TestCase
 
         $sql = $qb->build(true);
 
-        self::assertStringContainsString('CALL', $sql);
-        self::assertStringContainsString('get_user_by_id', $sql);
-        self::assertStringContainsString('1', $sql);
-        self::assertStringContainsString('active', $sql);
+        Assert::same($sql, 'CALL "get_user_by_id"(1, \'active\')');
     }
 
     public function testBuildProcedureWithNullParameter(): void
@@ -125,8 +121,7 @@ final class PgsqlSqlBuilderTest extends TestCase
 
         $sql = $qb->build(true);
 
-        self::assertStringContainsString('NULL', $sql);
-        self::assertStringContainsString('value', $sql);
+        Assert::same($sql, 'CALL "test_proc"(NULL, \'value\')');
     }
 
     public function testBuildProcedureWithBooleanParameters(): void
@@ -136,16 +131,14 @@ final class PgsqlSqlBuilderTest extends TestCase
 
         $sql = $qb->build(true);
 
-        self::assertStringContainsString('TRUE', $sql);
-        self::assertStringContainsString('FALSE', $sql);
+        Assert::same($sql, 'CALL "test_proc"(TRUE, FALSE)');
     }
 
     public function testBuildProcedureWithEmptyProcedureNameThrowsException(): void
     {
         $qb = $this->getQueryBuilder();
 
-        $this->expectException(InvalidIdentifierException::class);
-        $this->expectExceptionMessage('Empty table name is not allowed');
+        Expect::exception(InvalidIdentifierException::class)->withMessageContaining('Empty table name is not allowed');
 
         $qb->procedure('');
     }

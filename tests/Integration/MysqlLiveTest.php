@@ -4,11 +4,12 @@ declare(strict_types=1);
 
 namespace QBuilder\Tests\Integration;
 
-use PHPUnit\Framework\Attributes\DataProvider;
-use PHPUnit\Framework\Attributes\RequiresPhpExtension;
-use PHPUnit\Framework\TestCase;
 use QBuilder\QbConsts;
 use QBuilder\QueryBuilder;
+use Testo\Assert;
+use Testo\Core\Exception\SkipTest;
+use Testo\Data\DataProvider;
+use Testo\Test;
 
 /**
  * Executes generated SQL on a live MySQL/MariaDB server.
@@ -17,11 +18,9 @@ use QBuilder\QueryBuilder;
  * QBUILDER_TEST_MYSQL_PASSWORD are optional. Uses temporary tables only.
  *
  * @internal
- *
- * @coversNothing
  */
-#[RequiresPhpExtension('pdo_mysql')]
-final class MysqlLiveTest extends TestCase
+#[Test]
+final class MysqlLiveTest
 {
     private const string MODE_DEFAULT = 'SET SESSION sql_mode = DEFAULT';
 
@@ -37,7 +36,7 @@ final class MysqlLiveTest extends TestCase
             ->build()
         ;
 
-        self::assertSame([], $this->column($pdo, $sql));
+        Assert::same($this->column($pdo, $sql), []);
     }
 
     #[DataProvider('provideSqlModes')]
@@ -54,8 +53,8 @@ final class MysqlLiveTest extends TestCase
             ->build()
         ;
 
-        self::assertSame(['50%'], $this->column($pdo, $percent));
-        self::assertSame(['a_b'], $this->column($pdo, $underscore));
+        Assert::same($this->column($pdo, $percent), ['50%']);
+        Assert::same($this->column($pdo, $underscore), ['a_b']);
     }
 
     /**
@@ -79,7 +78,7 @@ final class MysqlLiveTest extends TestCase
 
         $sql = $this->builder()->select('name')->from('t')->where()->eq('name', $value)->end()->build();
 
-        self::assertSame([$value], $this->column($pdo, $sql));
+        Assert::same($this->column($pdo, $sql), [$value]);
     }
 
     /**
@@ -98,6 +97,10 @@ final class MysqlLiveTest extends TestCase
         yield 'control characters' => ["a\nb\rc\td\x1ae"];
 
         yield 'unicode' => ['Привет, 世界'];
+
+        yield '4-byte emoji' => ['ok 😀'];
+
+        yield 'NUL byte' => ["a\0b"];
     }
 
     public function testNumericLookingStringsAndBoolAreStoredAsIs(): void
@@ -111,11 +114,11 @@ final class MysqlLiveTest extends TestCase
         );
 
         $statement = $pdo->query('SELECT inn, code, active, qty FROM org');
-        self::assertNotFalse($statement);
+        Assert::instanceOf($statement, \PDOStatement::class);
 
-        self::assertSame(
-            ['inn' => '0123456789', 'code' => '1e3', 'active' => 0, 'qty' => 5],
-            $statement->fetch(\PDO::FETCH_ASSOC)
+        Assert::same(
+            $statement->fetch(\PDO::FETCH_ASSOC),
+            ['inn' => '0123456789', 'code' => '1e3', 'active' => 0, 'qty' => 5]
         );
     }
 
@@ -123,17 +126,17 @@ final class MysqlLiveTest extends TestCase
     {
         $pdo = $this->connection(self::MODE_DEFAULT);
         $version = $pdo->getAttribute(\PDO::ATTR_SERVER_VERSION);
-        self::assertIsString($version);
+        Assert::string($version);
 
-        self::assertSame(['b', 1], $this->upsert($pdo, $version));
-        self::assertSame([], $this->warnings($pdo));
+        Assert::same($this->upsert($pdo, $version), ['b', 1]);
+        Assert::same($this->warnings($pdo), []);
     }
 
     public function testUpsertWithUnknownVersionUsesValuesFunction(): void
     {
         $pdo = $this->connection(self::MODE_DEFAULT);
 
-        self::assertSame(['b', 1], $this->upsert($pdo, ''));
+        Assert::same($this->upsert($pdo, ''), ['b', 1]);
     }
 
     public function testIndexHintsAreAppliedByOptimizer(): void
@@ -155,19 +158,19 @@ final class MysqlLiveTest extends TestCase
             ->build()
         ;
 
-        self::assertSame('idx_b', $this->explainKey($pdo, $forced));
-        self::assertSame('PRIMARY', $this->explainKey($pdo, $primary));
-        self::assertNull($this->explainKey($pdo, $ignored));
+        Assert::same($this->explainKey($pdo, $forced), 'idx_b');
+        Assert::same($this->explainKey($pdo, $primary), 'PRIMARY');
+        Assert::null($this->explainKey($pdo, $ignored));
     }
 
     private function explainKey(\PDO $pdo, string $sql): ?string
     {
-        $statement = $pdo->query('EXPLAIN '.$sql);
-        self::assertNotFalse($statement);
+        $statement = $pdo->query('EXPLAIN ' . $sql);
+        Assert::instanceOf($statement, \PDOStatement::class);
         $row = $statement->fetch(\PDO::FETCH_ASSOC);
-        self::assertIsArray($row);
+        Assert::array($row);
         $key = $row['key'] ?? null;
-        self::assertTrue(null === $key || \is_string($key));
+        Assert::true(null === $key || \is_string($key));
 
         return $key;
     }
@@ -185,13 +188,13 @@ final class MysqlLiveTest extends TestCase
         $pdo->exec($qb->insert('u')->insertRow(['id' => 1, 'email' => 'b'])->insertConflictHandler($conflict)->build());
 
         $statement = $pdo->query('SELECT email, n FROM u WHERE id = 1');
-        self::assertNotFalse($statement);
+        Assert::instanceOf($statement, \PDOStatement::class);
         $row = $statement->fetch(\PDO::FETCH_NUM);
-        self::assertIsArray($row);
+        Assert::array($row);
 
         [$email, $counter] = $row;
-        self::assertIsString($email);
-        self::assertIsInt($counter);
+        Assert::string($email);
+        Assert::int($counter);
 
         return [$email, $counter];
     }
@@ -202,17 +205,21 @@ final class MysqlLiveTest extends TestCase
     private function warnings(\PDO $pdo): array
     {
         $statement = $pdo->query('SHOW WARNINGS');
-        self::assertNotFalse($statement);
+        Assert::instanceOf($statement, \PDOStatement::class);
 
         return array_values($statement->fetchAll(\PDO::FETCH_ASSOC));
     }
 
     private function connection(string $sqlMode): \PDO
     {
+        if (! \extension_loaded('pdo_mysql')) {
+            throw new SkipTest('pdo_mysql extension is not loaded');
+        }
+
         $dsn = getenv('QBUILDER_TEST_MYSQL_DSN');
 
         if (false === $dsn || '' === $dsn) {
-            self::markTestSkipped('QBUILDER_TEST_MYSQL_DSN is not set');
+            throw new SkipTest('QBUILDER_TEST_MYSQL_DSN is not set');
         }
 
         $user = getenv('QBUILDER_TEST_MYSQL_USER');
@@ -245,12 +252,12 @@ final class MysqlLiveTest extends TestCase
     private function column(\PDO $pdo, string $sql): array
     {
         $statement = $pdo->query($sql);
-        self::assertNotFalse($statement);
+        Assert::instanceOf($statement, \PDOStatement::class);
 
         $values = [];
 
         foreach ($statement->fetchAll(\PDO::FETCH_COLUMN) as $value) {
-            self::assertIsString($value);
+            Assert::string($value);
             $values[] = $value;
         }
 

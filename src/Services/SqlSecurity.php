@@ -5,13 +5,16 @@ declare(strict_types=1);
 namespace QBuilder\Services;
 
 use QBuilder\Exceptions\InvalidIdentifierException;
+use QBuilder\Exceptions\UnsupportedFeatureException;
 use QBuilder\QbConsts;
 
 /**
  * Service for safe SQL operations.
  * Protection against SQL injections for identifiers (tables, fields, aliases).
+ *
+ * @internal
  */
-class SqlSecurity
+final class SqlSecurity
 {
     /**
      * Validate identifier name (table, field, alias).
@@ -41,7 +44,7 @@ class SqlSecurity
             $upperIdentifier = strtoupper($identifier);
 
             foreach ($dangerousKeywords as $keyword) {
-                if ($upperIdentifier === $keyword || str_starts_with($upperIdentifier, $keyword.' ')) {
+                if ($upperIdentifier === $keyword || str_starts_with($upperIdentifier, $keyword . ' ')) {
                     throw new InvalidIdentifierException(
                         "Invalid {$type}: '{$identifier}'. SQL keyword detected for driver '{$driver}'"
                     );
@@ -49,7 +52,7 @@ class SqlSecurity
             }
         }
 
-        if (! preg_match('/^[a-zA-Z0-9_.]+$/', $identifier)) {
+        if (1 !== preg_match('/^[a-zA-Z0-9_.]+$/', $identifier)) {
             throw new InvalidIdentifierException(
                 "Invalid {$type}: '{$identifier}'. Only alphanumeric characters, underscores, and dots are allowed"
             );
@@ -161,7 +164,7 @@ class SqlSecurity
         if (! \in_array($operatorUpper, $validOperators, true)) {
             throw new InvalidIdentifierException(
                 "Invalid comparison operator: '{$operator}' for driver '{$driver}'. "
-                    .'Common operators: =, !=, <>, >, <, >=, <=, LIKE, NOT LIKE, IS, IS NOT, IN, NOT IN, BETWEEN'
+                    . 'Common operators: =, !=, <>, >, <, >=, <=, LIKE, NOT LIKE, IS, IS NOT, IN, NOT IN, BETWEEN'
             );
         }
 
@@ -169,19 +172,72 @@ class SqlSecurity
     }
 
     /**
-     * Safely escape identifier for use in backticks.
-     * Removes backticks from identifier.
+     * Validate an SQL fragment that becomes the right-hand side of an assignment.
      *
-     * @param string $identifier Identifier
-     * @param string $driver     Database driver
+     * The fragment must stay a single self-contained expression. Single- and double-quoted parts and
+     * identifiers quoted with the driver quotes are skipped; the remaining code may not contain backslashes,
+     * control characters, other quote characters, comments, statement separators, unbalanced
+     * parentheses, a comma outside parentheses or any of the forbidden keywords.
      *
-     * @return string Escaped identifier
+     * @param string       $fragment          SQL fragment
+     * @param string       $openQuote         Opening identifier quote of the driver
+     * @param string       $closeQuote        Closing identifier quote of the driver
+     * @param list<string> $forbiddenKeywords Keywords not allowed outside literals and quoted identifiers
+     * @param string       $type              Fragment type (for error message)
+     *
+     * @return string Validated fragment
+     *
+     * @throws InvalidIdentifierException If the fragment can leave its expression
      */
-    public static function escapeIdentifier(string $identifier, string $driver = QbConsts::DRIVER_PDO_MYSQL): string
-    {
-        $clean = str_replace('`', '', $identifier);
+    public static function validateSqlFragment(
+        string $fragment,
+        string $openQuote,
+        string $closeQuote,
+        array $forbiddenKeywords,
+        string $type = 'expression'
+    ): string {
+        if (0 !== preg_match('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F\\\]/', $fragment)) {
+            throw new InvalidIdentifierException("Invalid {$type}: backslashes and control characters are not allowed");
+        }
 
-        return self::validateIdentifier($clean, 'identifier', $driver);
+        $code = self::stripQuotedParts($fragment, $openQuote, $closeQuote, $type);
+
+        if (0 !== preg_match('/[\'"`\[\]{}$#;@]|--|\/\*|\*\//', $code)) {
+            throw new InvalidIdentifierException(
+                "Invalid {$type}: '{$fragment}'. Quotes, comments and statement separators are not allowed"
+            );
+        }
+
+        $depth = 0;
+
+        foreach (str_split($code) as $char) {
+            if ('(' === $char) {
+                ++$depth;
+            } elseif (')' === $char) {
+                --$depth;
+            }
+
+            if ($depth < 0 || (',' === $char && 0 === $depth)) {
+                throw new InvalidIdentifierException(
+                    "Invalid {$type}: '{$fragment}'. The expression must not leave its own parentheses"
+                );
+            }
+        }
+
+        if (0 !== $depth) {
+            throw new InvalidIdentifierException("Invalid {$type}: '{$fragment}'. Unbalanced parentheses");
+        }
+
+        $keywords = '/\b(?:' . implode('|', array_map(static fn (string $keyword): string => preg_quote(
+            $keyword,
+            '/'
+        ), $forbiddenKeywords)) . ')\b/i';
+
+        if ([] !== $forbiddenKeywords && 0 !== preg_match($keywords, $code)) {
+            throw new InvalidIdentifierException("Invalid {$type}: '{$fragment}'. Forbidden SQL keyword");
+        }
+
+        return $fragment;
     }
 
     /**
@@ -552,7 +608,7 @@ class SqlSecurity
                 'CHANGES',
                 'TOTAL_CHANGES',
             ],
-            default => [],
+            default => throw new UnsupportedFeatureException("Unsupported database driver: '{$driver}'"),
         };
 
         return array_merge($common, $specific);
@@ -577,8 +633,8 @@ class SqlSecurity
         $sqlKeywords = self::getDangerousKeywords($driver, true);
         $quotedPattern = preg_quote($quote, '/');
 
-        $pattern = '/(?<!'.$quotedPattern.')\b([a-zA-Z_][a-zA-Z0-9_]*)\.([a-zA-Z_][a-zA-Z0-9_]*)\b(?!'
-            .$quotedPattern.')/';
+        $pattern = '/(?<!' . $quotedPattern . ')\b([a-zA-Z_][a-zA-Z0-9_]*)\.([a-zA-Z_][a-zA-Z0-9_]*)\b(?!'
+            . $quotedPattern . ')/';
 
         $expression = (string) preg_replace_callback($pattern, static function ($matches) use ($quote, $sqlKeywords) {
             $table = $matches[1];
@@ -588,11 +644,11 @@ class SqlSecurity
                 return $matches[0];
             }
 
-            return $quote.$table.$quote.'.'.$quote.$field.$quote;
+            return $quote . $table . $quote . '.' . $quote . $field . $quote;
         }, $expression);
 
-        $singleFieldPattern = '/\b([A-Z_]+)\s*\(\s*(?<!'.$quotedPattern.')([a-zA-Z_][a-zA-Z0-9_]*)(?!'
-            .$quotedPattern.')\s*\)/';
+        $singleFieldPattern = '/\b([A-Z_]+)\s*\(\s*(?<!' . $quotedPattern . ')([a-zA-Z_][a-zA-Z0-9_]*)(?!'
+            . $quotedPattern . ')\s*\)/';
 
         return (string) preg_replace_callback(
             $singleFieldPattern,
@@ -604,7 +660,7 @@ class SqlSecurity
                     return $matches[0];
                 }
 
-                return $func.'('.$quote.$field.$quote.')';
+                return $func . '(' . $quote . $field . $quote . ')';
             },
             $expression
         );
@@ -766,10 +822,10 @@ class SqlSecurity
                 'CONFLICT',
                 'ABORT',
             ],
-            default => [],
+            default => throw new UnsupportedFeatureException("Unsupported database driver: '{$driver}'"),
         };
 
-        return array_merge($common, $specific, $includeFunctions ? static::getSqlFunctions($driver) : []);
+        return array_merge($common, $specific, $includeFunctions ? self::getSqlFunctions($driver) : []);
     }
 
     /**
@@ -866,9 +922,65 @@ class SqlSecurity
                 'REGEXP',
                 'NOT REGEXP',
             ],
-            default => [],
+            default => throw new UnsupportedFeatureException("Unsupported database driver: '{$driver}'"),
         };
 
         return array_merge($common, $specific);
+    }
+
+    /**
+     * Replace quoted parts with neutral tokens.
+     *
+     * @throws InvalidIdentifierException If a literal or an identifier is not closed
+     */
+    private static function stripQuotedParts(
+        string $fragment,
+        string $openQuote,
+        string $closeQuote,
+        string $type
+    ): string {
+        $code = '';
+        $length = \strlen($fragment);
+        $position = 0;
+
+        while ($position < $length) {
+            $char = $fragment[$position];
+
+            if ("'" === $char || '"' === $char) {
+                $position = self::findClosingQuote($fragment, $position + 1, $char, $type);
+                $code .= ' 0 ';
+            } elseif ($openQuote === $char) {
+                $position = self::findClosingQuote($fragment, $position + 1, $closeQuote, $type);
+                $code .= ' q ';
+            } else {
+                $code .= $char;
+            }
+
+            ++$position;
+        }
+
+        return $code;
+    }
+
+    /**
+     * Find the closing quote, a doubled quote is an escaped one.
+     *
+     * @throws InvalidIdentifierException If the quote is not closed
+     */
+    private static function findClosingQuote(string $fragment, int $offset, string $quote, string $type): int
+    {
+        while (true) {
+            $position = strpos($fragment, $quote, $offset);
+
+            if (false === $position) {
+                throw new InvalidIdentifierException("Invalid {$type}: '{$fragment}'. Unterminated quote");
+            }
+
+            if (($fragment[$position + 1] ?? '') !== $quote) {
+                return $position;
+            }
+
+            $offset = $position + 2;
+        }
     }
 }

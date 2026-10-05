@@ -4,21 +4,23 @@ declare(strict_types=1);
 
 namespace QBuilder\Tests;
 
-use PHPUnit\Framework\Attributes\DataProvider;
-use PHPUnit\Framework\TestCase;
 use QBuilder\Condition\ConditionJoin;
 use QBuilder\Exceptions\InvalidIdentifierException;
 use QBuilder\Exceptions\InvalidQueryException;
 use QBuilder\Exceptions\UnsupportedFeatureException;
 use QBuilder\QbConsts;
 use QBuilder\QueryBuilder;
+use Testo\Assert;
+use Testo\Assert\ExpectException;
+use Testo\Data\DataProvider;
+use Testo\Expect;
+use Testo\Test;
 
 /**
  * @internal
- *
- * @coversNothing
  */
-final class IndexHintTest extends TestCase
+#[Test]
+final class IndexHintTest
 {
     public function testMysqlHintsOnFromTable(): void
     {
@@ -28,11 +30,8 @@ final class IndexHintTest extends TestCase
             ->build(true)
         ;
 
-        self::assertSame(
-            'SELECT `o`.`id` FROM `orders` AS `o` FORCE INDEX (`idx_created`) '
-                .'IGNORE INDEX FOR ORDER BY (`idx_a`, `idx_b`)',
-            $sql
-        );
+        Assert::same($sql, 'SELECT `o`.`id` FROM `orders` AS `o` FORCE INDEX (`idx_created`) '
+            . 'IGNORE INDEX FOR ORDER BY (`idx_a`, `idx_b`)');
     }
 
     public function testMysqlHintAppliesToLastJoin(): void
@@ -45,18 +44,15 @@ final class IndexHintTest extends TestCase
             ->build(true)
         ;
 
-        self::assertSame(
-            'SELECT `o`.`id` FROM `orders` AS `o` USE INDEX FOR JOIN (`idx_status`) '
-                .'LEFT JOIN `users` AS `u` USE INDEX (`PRIMARY`) ON (`u`.`id` = `o`.`user_id`)',
-            $sql
-        );
+        Assert::same($sql, 'SELECT `o`.`id` FROM `orders` AS `o` USE INDEX FOR JOIN (`idx_status`) '
+            . 'LEFT JOIN `users` AS `u` USE INDEX (`PRIMARY`) ON (`u`.`id` = `o`.`user_id`)');
     }
 
     public function testMysqlEmptyUseIndex(): void
     {
         $sql = (new QueryBuilder())->select('id')->from('orders')->useIndex([])->build(true);
 
-        self::assertSame('SELECT `id` FROM `orders` USE INDEX ()', $sql);
+        Assert::same($sql, 'SELECT `id` FROM `orders` USE INDEX ()');
     }
 
     public function testMssqlForceIndex(): void
@@ -70,31 +66,38 @@ final class IndexHintTest extends TestCase
             ->build(true)
         ;
 
-        self::assertStringContainsString('FROM [orders] AS [o] WITH (INDEX([ix_created], [ix_status])) INNER', $sql);
-        self::assertStringContainsString('INNER JOIN [users] AS [u] WITH (INDEX([pk_users])) ON', $sql);
+        Assert::same(
+            $sql,
+            'SELECT [id] FROM [orders] AS [o] WITH (INDEX([ix_created], [ix_status])) INNER JOIN '
+                . '[users] AS [u] WITH (INDEX([pk_users])) ON ([u].[id] = [o].[user_id])'
+        );
     }
 
+    /**
+     * @param \Closure(QueryBuilder): QueryBuilder $addHint
+     */
     #[DataProvider('provideMssqlRejectsHintsWithoutEquivalentCases')]
-    public function testMssqlRejectsHintsWithoutEquivalent(string $method, string $for): void
+    public function testMssqlRejectsHintsWithoutEquivalent(\Closure $addHint): void
     {
-        $qb = (new QueryBuilder(QbConsts::DRIVER_MSSQL))->select('id')->from('orders');
-        $qb->{$method}('ix_created', $for);
+        $qb = $addHint((new QueryBuilder(QbConsts::DRIVER_MSSQL))->select('id')->from('orders'));
 
-        $this->expectException(UnsupportedFeatureException::class);
+        Expect::exception(UnsupportedFeatureException::class);
 
         $qb->build();
     }
 
     /**
-     * @return iterable<string, array{string, string}>
+     * @return iterable<string, array{\Closure(QueryBuilder): QueryBuilder}>
      */
     public static function provideMssqlRejectsHintsWithoutEquivalentCases(): iterable
     {
-        yield 'use index' => ['useIndex', ''];
+        yield 'use index' => [static fn (QueryBuilder $qb): QueryBuilder => $qb->useIndex('ix_created')];
 
-        yield 'ignore index' => ['ignoreIndex', ''];
+        yield 'ignore index' => [static fn (QueryBuilder $qb): QueryBuilder => $qb->ignoreIndex('ix_created')];
 
-        yield 'force index with scope' => ['forceIndex', QbConsts::INDEX_FOR_JOIN];
+        yield 'force index with scope' => [
+            static fn (QueryBuilder $qb): QueryBuilder => $qb->forceIndex('ix_created', QbConsts::INDEX_FOR_JOIN),
+        ];
     }
 
     #[DataProvider('provideOtherDriversIgnoreHintsCases')]
@@ -106,7 +109,7 @@ final class IndexHintTest extends TestCase
             ->build(true)
         ;
 
-        self::assertSame($expected, $sql);
+        Assert::same($sql, $expected);
     }
 
     /**
@@ -123,10 +126,9 @@ final class IndexHintTest extends TestCase
         yield 'clickhouse' => [QbConsts::DRIVER_CLICKHOUSE, 'SELECT `id` FROM `orders`'];
     }
 
+    #[ExpectException(InvalidQueryException::class)]
     public function testHintBeforeFromThrows(): void
     {
-        $this->expectException(InvalidQueryException::class);
-
         (new QueryBuilder())->select('id')->useIndex('idx_a');
     }
 
@@ -134,50 +136,44 @@ final class IndexHintTest extends TestCase
     {
         $qb = new QueryBuilder();
 
-        $this->expectException(InvalidQueryException::class);
+        Expect::exception(InvalidQueryException::class);
 
         $qb->select('id')->from($qb->subQuery()->select('id')->from('orders'), 's')->useIndex('idx_a');
     }
 
+    #[ExpectException(InvalidQueryException::class)]
     public function testHintOutsideSelectThrows(): void
     {
-        $this->expectException(InvalidQueryException::class);
-
         (new QueryBuilder())->update('orders')->useIndex('idx_a');
     }
 
+    #[ExpectException(InvalidQueryException::class)]
     public function testUseAndForceCannotBeCombined(): void
     {
-        $this->expectException(InvalidQueryException::class);
-
         (new QueryBuilder())->select('id')->from('orders')->useIndex('idx_a')->forceIndex('idx_b');
     }
 
+    #[ExpectException(InvalidQueryException::class)]
     public function testEmptyListIsAllowedOnlyForUse(): void
     {
-        $this->expectException(InvalidQueryException::class);
-
         (new QueryBuilder())->select('id')->from('orders')->forceIndex([]);
     }
 
+    #[ExpectException(InvalidQueryException::class)]
     public function testInvalidScopeThrows(): void
     {
-        $this->expectException(InvalidQueryException::class);
-
         (new QueryBuilder())->select('id')->from('orders')->useIndex('idx_a', 'WHERE');
     }
 
+    #[ExpectException(InvalidQueryException::class)]
     public function testIndexNameWithDotThrows(): void
     {
-        $this->expectException(InvalidQueryException::class);
-
         (new QueryBuilder())->select('id')->from('orders')->useIndex('db.idx_a');
     }
 
+    #[ExpectException(InvalidIdentifierException::class)]
     public function testIndexNameWithInjectionThrows(): void
     {
-        $this->expectException(InvalidIdentifierException::class);
-
         (new QueryBuilder())->select('id')->from('orders')->useIndex('idx) UNION SELECT 1 -- ');
     }
 
@@ -186,6 +182,6 @@ final class IndexHintTest extends TestCase
         $qb = new QueryBuilder();
         $qb->select('id')->from('orders')->forceIndex('idx_a');
 
-        self::assertSame('SELECT `id` FROM `users`', $qb->select('id')->from('users')->build(true));
+        Assert::same($qb->select('id')->from('users')->build(true), 'SELECT `id` FROM `users`');
     }
 }

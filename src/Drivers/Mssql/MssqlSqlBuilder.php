@@ -11,8 +11,10 @@ use QBuilder\Drivers\AbstractSqlBuilder;
  *
  * Responsible for forming final SQL from query settings
  * taking into account MS SQL Server specifics.
+ *
+ * @internal
  */
-class MssqlSqlBuilder extends AbstractSqlBuilder
+final class MssqlSqlBuilder extends AbstractSqlBuilder
 {
     #[\Override]
     public function buildSelect(): string
@@ -28,7 +30,7 @@ class MssqlSqlBuilder extends AbstractSqlBuilder
         $withTies = $this->queryBuilder->isLimitWithTies();
 
         if (null !== $limitValue && (null === $offsetValue || 0 === $offsetValue)) {
-            $sql .= 'TOP '.$limitValue;
+            $sql .= 'TOP ' . $limitValue;
 
             if ($withTies) {
                 $sql .= ' WITH TIES';
@@ -80,11 +82,7 @@ class MssqlSqlBuilder extends AbstractSqlBuilder
     {
         $procedureName = $this->queryBuilder->getProcedureName();
 
-        if ('' === $procedureName || '0' === $procedureName) {
-            return '';
-        }
-
-        $sql = 'EXEC '.$this->driver->quoteName($procedureName);
+        $sql = 'EXEC ' . $this->driver->quoteName($procedureName);
 
         $params = $this->queryBuilder->getProcedureParams();
 
@@ -95,7 +93,7 @@ class MssqlSqlBuilder extends AbstractSqlBuilder
         }
 
         if ([] !== $formattedParams) {
-            $sql .= ' '.implode(', ', $formattedParams);
+            $sql .= ' ' . implode(', ', $formattedParams);
         }
 
         return $sql;

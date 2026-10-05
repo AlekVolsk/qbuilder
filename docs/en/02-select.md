@@ -37,6 +37,8 @@ $qb->select(
 ### Fields with Aliases
 
 ```php
+use QBuilder\Condition\Field;
+
 $qb->select(
     Field::set('id', 'users'),
     Field::set('name', 'users', 'user_name'),
@@ -49,6 +51,9 @@ $qb->select(
 ### All Fields of a Table
 
 ```php
+use QBuilder\Condition\ConditionJoin;
+use QBuilder\Condition\Field;
+
 $qb->select(
     Field::set('id', 'users'),
     Field::set('*', 'orders')
@@ -79,6 +84,8 @@ $qb->select(
 ### DATE_FORMAT and Other Functions
 
 ```php
+use QBuilder\Condition\Field;
+
 $qb->select(
     Field::set('id', 'orders'),
     'DATE_FORMAT(`orders`.`created_at`, "%d-%m-%Y") AS created_date',
@@ -91,6 +98,8 @@ $qb->select(
 An unsigned integer is selected as a literal, unquoted — e.g. for `EXISTS (SELECT 1 ...)`:
 
 ```php
+use QBuilder\Condition\Field;
+
 $qb->select('1')->from('orders');
 // SELECT 1 FROM `orders`
 

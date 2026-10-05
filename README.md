@@ -9,7 +9,7 @@
 - WHERE and HAVING conditions with nested groups
 - JOINs, subqueries, aggregates, UNION, recursive CTEs
 - Two syntaxes: method chaining and closures
-- PHPUnit test suite, PHPStan level 10
+- Testo test suite, PHPStan at max level with strict rules
 
 ## Installation
 

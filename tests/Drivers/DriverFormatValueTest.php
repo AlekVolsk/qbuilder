@@ -4,29 +4,28 @@ declare(strict_types=1);
 
 namespace QBuilder\Tests;
 
-use PHPUnit\Framework\Attributes\DataProvider;
-use PHPUnit\Framework\TestCase;
 use QBuilder\Drivers\DriverFactory;
 use QBuilder\Exceptions\InvalidQueryException;
 use QBuilder\QbConsts;
+use Testo\Assert;
+use Testo\Assert\ExpectException;
+use Testo\Data\DataProvider;
+use Testo\Expect;
+use Testo\Test;
 
 /**
  * @internal
- *
- * @coversNothing
  */
-final class DriverFormatValueTest extends TestCase
+#[Test]
+final class DriverFormatValueTest
 {
-    /**
-     * @param ?scalar $value
-     */
     #[DataProvider('provideFormatValueByPhpTypeCases')]
     public function testFormatValueByPhpType(
         string $driverType,
         bool|float|int|string|null $value,
         string $expected
     ): void {
-        self::assertSame($expected, DriverFactory::create($driverType)->formatValue($value));
+        Assert::same(DriverFactory::create($driverType)->formatValue($value), $expected);
     }
 
     /**
@@ -69,10 +68,9 @@ final class DriverFormatValueTest extends TestCase
     }
 
     #[DataProvider('provideFormatValueRejectsNonFiniteFloatCases')]
+    #[ExpectException(InvalidQueryException::class)]
     public function testFormatValueRejectsNonFiniteFloat(float $value): void
     {
-        $this->expectException(InvalidQueryException::class);
-
         DriverFactory::create(QbConsts::DRIVER_PDO_MYSQL)->formatValue($value);
     }
 
@@ -86,5 +84,22 @@ final class DriverFormatValueTest extends TestCase
         yield '-INF' => [-INF];
 
         yield 'NAN' => [NAN];
+    }
+
+    #[DataProvider('provideNulByteIsRejectedCases')]
+    public function testNulByteIsRejected(string $driverType): void
+    {
+        Expect::exception(InvalidQueryException::class)->withMessageContaining('must not contain NUL bytes');
+
+        DriverFactory::create($driverType)->formatValue("a\0b");
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function provideNulByteIsRejectedCases(): iterable
+    {
+        yield 'PostgreSQL' => [QbConsts::DRIVER_PGSQL];
+        yield 'SQLite' => [QbConsts::DRIVER_SQLITE];
     }
 }

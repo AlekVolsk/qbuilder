@@ -7,6 +7,7 @@ namespace QBuilder\Drivers\Sqlite;
 use QBuilder\Builder\ConflictBuilderInterface;
 use QBuilder\Drivers\AbstractDriver;
 use QBuilder\Drivers\SqlBuilderInterface;
+use QBuilder\Exceptions\InvalidQueryException;
 use QBuilder\Exceptions\UnsupportedFeatureException;
 use QBuilder\QueryBuilder;
 
@@ -14,8 +15,10 @@ use QBuilder\QueryBuilder;
  * SQLite driver for QueryBuilder.
  *
  * Implements specific SQL query building logic for SQLite.
+ *
+ * @internal
  */
-class SqliteDriver extends AbstractDriver
+final class SqliteDriver extends AbstractDriver
 {
     public function getSqlBuilder(QueryBuilder $queryBuilder): SqlBuilderInterface
     {
@@ -37,8 +40,15 @@ class SqliteDriver extends AbstractDriver
         return "'";
     }
 
+    /**
+     * @throws InvalidQueryException If the value contains a NUL byte: the SQL text ends at it
+     */
     public function escapeValue(string $value): string
     {
+        if (str_contains($value, "\0")) {
+            throw new InvalidQueryException('SQLite string value must not contain NUL bytes');
+        }
+
         return str_replace("'", "''", $value);
     }
 
@@ -47,22 +57,17 @@ class SqliteDriver extends AbstractDriver
         if ($withTies) {
             throw new UnsupportedFeatureException(
                 'SQLite does not support LIMIT WITH TIES. '
-                .'This feature is available in PostgreSQL, MS SQL Server, Oracle, and ClickHouse.'
+                . 'This feature is available in PostgreSQL, MS SQL Server, Oracle, and ClickHouse.'
             );
         }
 
-        $sql = "\nLIMIT ".$limit;
+        $sql = "\nLIMIT " . $limit;
 
         if (null !== $offset && $offset > 0) {
-            $sql .= "\nOFFSET ".$offset;
+            $sql .= "\nOFFSET " . $offset;
         }
 
         return $sql;
-    }
-
-    public function getName(): string
-    {
-        return 'sqlite';
     }
 
     /**

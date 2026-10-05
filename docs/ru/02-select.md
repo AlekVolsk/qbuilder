@@ -37,6 +37,8 @@ $qb->select(
 ### Поля с алиасами
 
 ```php
+use QBuilder\Condition\Field;
+
 $qb->select(
     Field::set('id', 'users'),
     Field::set('name', 'users', 'user_name'),
@@ -49,6 +51,9 @@ $qb->select(
 ### Все поля таблицы
 
 ```php
+use QBuilder\Condition\ConditionJoin;
+use QBuilder\Condition\Field;
+
 $qb->select(
     Field::set('id', 'users'),
     Field::set('*', 'orders')
@@ -79,6 +84,8 @@ $qb->select(
 ### DATE_FORMAT и другие функции
 
 ```php
+use QBuilder\Condition\Field;
+
 $qb->select(
     Field::set('id', 'orders'),
     'DATE_FORMAT(`orders`.`created_at`, "%d-%m-%Y") AS created_date',
@@ -91,6 +98,8 @@ $qb->select(
 Целое число без знака выбирается как литерал, без кавычек — например, для `EXISTS (SELECT 1 ...)`:
 
 ```php
+use QBuilder\Condition\Field;
+
 $qb->select('1')->from('orders');
 // SELECT 1 FROM `orders`
 

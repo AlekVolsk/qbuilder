@@ -4,24 +4,23 @@ declare(strict_types=1);
 
 namespace QBuilder\Tests\Integration;
 
-use PHPUnit\Framework\Attributes\DataProvider;
-use PHPUnit\Framework\Attributes\RequiresPhpExtension;
-use PHPUnit\Framework\TestCase;
 use QBuilder\Condition\ConditionBy;
 use QBuilder\Condition\ConditionJoin;
 use QBuilder\Condition\Field;
 use QBuilder\QbConsts;
 use QBuilder\QueryBuilder;
+use Testo\Assert;
+use Testo\Core\Exception\SkipTest;
+use Testo\Data\DataProvider;
+use Testo\Test;
 
 /**
  * Executes generated SQL on an in-memory SQLite database.
  *
  * @internal
- *
- * @coversNothing
  */
-#[RequiresPhpExtension('pdo_sqlite')]
-final class SqliteLiveTest extends TestCase
+#[Test]
+final class SqliteLiveTest
 {
     /**
      * @param list<string> $expected
@@ -35,7 +34,7 @@ final class SqliteLiveTest extends TestCase
             ->build()
         ;
 
-        self::assertSame($expected, $this->column($sql));
+        Assert::same($this->column($sql), $expected);
     }
 
     /**
@@ -59,8 +58,8 @@ final class SqliteLiveTest extends TestCase
             ->build()
         ;
 
-        self::assertNotContains('50%', $this->column($sql));
-        self::assertContains('5000', $this->column($sql));
+        Assert::iterable($this->column($sql))->notContains('50%');
+        Assert::contains($this->column($sql), '5000');
     }
 
     public function testStringValuesRoundTrip(): void
@@ -70,7 +69,7 @@ final class SqliteLiveTest extends TestCase
             ->build()
         ;
 
-        self::assertEqualsCanonicalizing(["O'Neil", 'C:\dir'], $this->column($sql));
+        Assert::array($this->column($sql))->sameElementsAs(["O'Neil", 'C:\dir']);
     }
 
     public function testExistsWithSelectOne(): void
@@ -82,12 +81,12 @@ final class SqliteLiveTest extends TestCase
             ->build()
         ;
 
-        self::assertSame(['axb'], $this->column($sql));
+        Assert::same($this->column($sql), ['axb']);
     }
 
     public function testJoinOnTablesWithSameColumnName(): void
     {
-        $pdo = new \PDO('sqlite::memory:', null, null, [\PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION]);
+        $pdo = $this->connection();
         $pdo->exec('CREATE TABLE orders (id INTEGER, user_id INTEGER)');
         $pdo->exec('CREATE TABLE users (id INTEGER, name TEXT)');
         $pdo->exec("INSERT INTO orders VALUES (1, 10), (2, 20); INSERT INTO users VALUES (10, 'Ann'), (20, 'Bob')");
@@ -100,14 +99,23 @@ final class SqliteLiveTest extends TestCase
         ;
 
         $statement = $pdo->query($sql);
-        self::assertNotFalse($statement);
+        Assert::instanceOf($statement, \PDOStatement::class);
 
-        self::assertSame(['Bob'], $statement->fetchAll(\PDO::FETCH_COLUMN));
+        Assert::same($statement->fetchAll(\PDO::FETCH_COLUMN), ['Bob']);
+    }
+
+    private function connection(): \PDO
+    {
+        if (! \extension_loaded('pdo_sqlite')) {
+            throw new SkipTest('pdo_sqlite extension is not loaded');
+        }
+
+        return new \PDO('sqlite::memory:', null, null, [\PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION]);
     }
 
     private function seededConnection(): \PDO
     {
-        $pdo = new \PDO('sqlite::memory:', null, null, [\PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION]);
+        $pdo = $this->connection();
         $pdo->exec('CREATE TABLE t (name TEXT)');
 
         foreach (['50%', '5000', '50 percent', 'a_b', 'axb', 'x!y', 'xzy', "O'Neil", 'C:\dir'] as $name) {
@@ -128,12 +136,12 @@ final class SqliteLiveTest extends TestCase
     private function column(string $sql): array
     {
         $statement = $this->seededConnection()->query($sql);
-        self::assertNotFalse($statement);
+        Assert::instanceOf($statement, \PDOStatement::class);
 
         $values = [];
 
         foreach ($statement->fetchAll(\PDO::FETCH_COLUMN) as $value) {
-            self::assertIsString($value);
+            Assert::string($value);
             $values[] = $value;
         }
 

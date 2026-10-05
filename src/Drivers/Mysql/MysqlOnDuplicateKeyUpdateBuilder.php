@@ -5,54 +5,29 @@ declare(strict_types=1);
 namespace QBuilder\Drivers\Mysql;
 
 use QBuilder\Builder\AbstractOnConflictBuilder;
-use QBuilder\Drivers\DriverInterface;
-use QBuilder\QueryBuilder;
 
 /**
  * ON DUPLICATE KEY UPDATE builder for MySQL.
  *
- * MySQL-specific syntax for handling duplicates on INSERT.
- * Allows building complex UPDATE expressions using:
- * - Simple values (automatically quoted)
- * - SQL functions (NOW(), CURDATE(), etc.)
- * - VALUES() to reference inserted values
- * - Arithmetic expressions (count + 1, price * 1.1, etc.)
- * - Conditional expressions (CASE WHEN)
+ * build() returns only the assignments: the INSERT builder places the row alias and the
+ * ON DUPLICATE KEY UPDATE keywords after VALUES (see MysqlSqlBuilder::buildInsertConflictSuffix()).
+ * MySQL detects the conflict by unique keys, so conflictTarget() has no effect.
  *
  * @example
- * // Simple usage (values are safely escaped)
- * $builder = MysqlOnDuplicateKeyUpdateBuilder::create($db, $driver)
- *     ->set('name', $userName)  // Safe: automatically quoted
- *     ->increment('count', 1);
+ * $qb->insert('users')
+ *     ->insertRow(['email' => $email, 'name' => $userName, 'view_count' => 1])
+ *     ->insertConflictHandler(
+ *         $qb->conflictBuilder()
+ *             ->excluded('name')          // `name` = VALUES(`name`) or `new`.`name`
+ *             ->increment('view_count')   // `view_count` = `view_count` + 1
+ *     );
  *
- * // Using VALUES() reference
- * $builder = MysqlOnDuplicateKeyUpdateBuilder::create($db, $driver)
- *     ->excluded('email')  // Generates: email = VALUES(email)
- *     ->increment('view_count', 1)
- *     ->sqlFunction('updated_at', 'NOW()');
- *
- * // Complex expressions
- * $builder = MysqlOnDuplicateKeyUpdateBuilder::create($db, $driver)
- *     ->expression('price', 'price * 1.1')
- *     ->caseExpression('status', [
- *         'WHEN count > 10 THEN "active"',
- *         'ELSE "pending"'
- *     ]);
+ * @internal
  */
-class MysqlOnDuplicateKeyUpdateBuilder extends AbstractOnConflictBuilder
+final class MysqlOnDuplicateKeyUpdateBuilder extends AbstractOnConflictBuilder
 {
-    /**
-     * Create new builder instance.
-     *
-     * @param QueryBuilder    $queryBuilder Parent QueryBuilder
-     * @param DriverInterface $driver       MySQL driver
-     */
-    public static function create(QueryBuilder $queryBuilder, DriverInterface $driver): self
-    {
-        return new self($queryBuilder, $driver);
-    }
-
     #[\Override]
+    // phpcs:ignore SlevomatCodingStandard.Functions.UnusedParameter -- MySQL resolves conflicts by unique keys
     public function conflictTarget(array $fields): self
     {
         return $this;
@@ -65,11 +40,12 @@ class MysqlOnDuplicateKeyUpdateBuilder extends AbstractOnConflictBuilder
             return '';
         }
 
-        return implode(', ', $this->updates);
+        return $this->buildUpdates();
     }
 
     /**
-     * Row alias reference `new`.`field` when the server supports it (MySQL 8.0.19+), VALUES(`field`) otherwise.
+     * Row alias reference `` `new`.`field` `` when the server supports it (MySQL 8.0.19+),
+     * `` VALUES(`field`) `` otherwise.
      *
      * @param string $quotedField Quoted field name
      *
@@ -81,21 +57,9 @@ class MysqlOnDuplicateKeyUpdateBuilder extends AbstractOnConflictBuilder
         $driver = $this->getDriver();
 
         if ($driver instanceof MysqlDriver && $driver->supportsInsertRowAlias()) {
-            return $driver->quoteName(MysqlDriver::INSERT_ROW_ALIAS).'.'.$quotedField;
+            return $driver->quoteName(MysqlDriver::INSERT_ROW_ALIAS) . '.' . $quotedField;
         }
 
-        return 'VALUES('.$quotedField.')';
-    }
-
-    #[\Override]
-    protected function buildConflictClause(): string
-    {
-        return '';
-    }
-
-    #[\Override]
-    protected function buildUpdatePrefix(): string
-    {
-        return 'ON DUPLICATE KEY UPDATE';
+        return 'VALUES(' . $quotedField . ')';
     }
 }

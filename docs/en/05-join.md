@@ -6,6 +6,7 @@
 
 ```php
 use QBuilder\Condition\ConditionJoin;
+use QBuilder\Condition\Field;
 
 $qb->select(
     Field::set('*', 'orders'),
@@ -26,6 +27,9 @@ $qb->select(
 ### JOIN with an Alias
 
 ```php
+use QBuilder\Condition\ConditionJoin;
+use QBuilder\Condition\Field;
+
 $qb->select(
     Field::set('*', 'orders'),
     Field::set('name', 'u', 'user_name')
@@ -45,6 +49,8 @@ $qb->select(
 ### JOIN with Multiple Conditions
 
 ```php
+use QBuilder\Condition\ConditionJoin;
+
 $condition = ConditionJoin::create($qb, 'id', 'user_id', 'orders')
     ->and()->eq('status', 'active');
 
@@ -58,6 +64,8 @@ $qb->leftJoin('users', 'u', $condition);
 A field without a table in a JOIN condition refers to the joined table and gets its alias (or the table name when there is no alias) — on every database and for any condition: `eq`, `in`, `like`, `isNull`, `between`, etc. A field with a table (`'o.user_id'`, `Field::set('user_id', 'o')`, the `targetTable` argument) stays as given; `raw()` is not changed.
 
 ```php
+use QBuilder\Condition\ConditionJoin;
+
 $condition = ConditionJoin::create($qb, 'id', 'user_id', 'o')
     ->and()->in('status', ['active', 'trial'])
     ->and()->isNull('deleted_at');
@@ -72,6 +80,8 @@ $qb->select('*')->from('orders', 'o')->innerJoin('users', 'u', $condition);
 ## INNER JOIN
 
 ```php
+use QBuilder\Condition\ConditionJoin;
+
 $qb->innerJoin(
     'orders',
     'o',
@@ -84,6 +94,8 @@ $qb->innerJoin(
 ## RIGHT JOIN
 
 ```php
+use QBuilder\Condition\ConditionJoin;
+
 $qb->rightJoin(
     'orders',
     'o',
@@ -96,6 +108,9 @@ $qb->rightJoin(
 ## Multiple JOINs
 
 ```php
+use QBuilder\Condition\ConditionJoin;
+use QBuilder\Condition\Field;
+
 $qb->select(
     Field::set('*', 'orders'),
     Field::set('name', 'users', 'user_name'),

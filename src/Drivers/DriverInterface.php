@@ -13,6 +13,8 @@ use QBuilder\QueryBuilder;
  * Database driver interface for QueryBuilder.
  *
  * Defines contract for specific SQL query building logic.
+ *
+ * @internal
  */
 interface DriverInterface
 {
@@ -142,6 +144,24 @@ interface DriverInterface
      * @return string SQL fragment for LIMIT
      */
     public function getLimitSql(int $limit, ?int $offset = null, bool $withTies = false): string;
+
+    /**
+     * Whether the LIMIT fragment of getLimitSql() is valid only after ORDER BY.
+     */
+    public function limitRequiresOrderBy(): bool;
+
+    /**
+     * Whether ORDER BY and LIMIT after a UNION apply only to its last query,
+     * so the UNION has to be wrapped into a derived table to sort or limit the whole result.
+     */
+    public function unionTailAppliesToLastQuery(): bool;
+
+    /**
+     * UNION operator of the dialect.
+     *
+     * @param bool $all UNION ALL instead of a distinct UNION
+     */
+    public function unionOperator(bool $all): string;
 
     /**
      * Does driver support WITH RECURSIVE (CTE).

@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace QBuilder\Tests;
 
-use PHPUnit\Framework\TestCase;
 use QBuilder\Builder\RecursiveCteBuilder;
 use QBuilder\Condition\ConditionBy;
 use QBuilder\Condition\ConditionJoin;
@@ -12,13 +11,15 @@ use QBuilder\Condition\Field;
 use QBuilder\Exceptions\InvalidQueryException;
 use QBuilder\Exceptions\MissingRequirementException;
 use QBuilder\QueryBuilder;
+use Testo\Assert;
+use Testo\Expect;
+use Testo\Test;
 
 /**
  * @internal
- *
- * @coversNothing
  */
-final class RecursiveCteBuilderTest extends TestCase
+#[Test]
+final class RecursiveCteBuilderTest
 {
     public function testRecursiveCteSimple(): void
     {
@@ -49,13 +50,13 @@ final class RecursiveCteBuilderTest extends TestCase
         ;
 
         $expected = 'WITH RECURSIVE `category_tree` AS ( '
-            .'SELECT `id`, `name`, `parent_id` FROM `categories` WHERE (`parent_id` IS NULL) '
-            .'UNION ALL '
-            .'SELECT `c`.`id`, `c`.`name`, `c`.`parent_id` FROM `categories` AS `c` '
-            .'INNER JOIN `category_tree` AS `ct` ON (`c`.`parent_id` = `ct`.`id`) '
-            .') SELECT * FROM `category_tree`';
+            . 'SELECT `id`, `name`, `parent_id` FROM `categories` WHERE (`parent_id` IS NULL) '
+            . 'UNION ALL '
+            . 'SELECT `c`.`id`, `c`.`name`, `c`.`parent_id` FROM `categories` AS `c` '
+            . 'INNER JOIN `category_tree` AS `ct` ON (`c`.`parent_id` = `ct`.`id`) '
+            . ') SELECT * FROM `category_tree`';
 
-        self::assertSame($expected, $sql);
+        Assert::same($sql, $expected);
     }
 
     public function testRecursiveCteWithPath(): void
@@ -101,17 +102,17 @@ final class RecursiveCteBuilderTest extends TestCase
         ;
 
         $expected = 'WITH RECURSIVE `category_tree` AS ( '
-            .'SELECT `id`, `name`, `parent_id`, `name` AS `path` FROM `categories` '
-            .'WHERE (`parent_id` IS NULL) '
-            .'UNION ALL '
-            .'SELECT `c`.`id`, `c`.`name`, `c`.`parent_id`, '
-            ."CONCAT(`ct`.`path`, ' > ', `c`.`name`) AS `path` "
-            .'FROM `categories` AS `c` '
-            .'INNER JOIN `category_tree` AS `ct` ON (`c`.`parent_id` = `ct`.`id`) '
-            .'ORDER BY `c`.`name` ASC '
-            .') SELECT `id`, `name`, `path` FROM `category_tree` ORDER BY `path` ASC';
+            . 'SELECT `id`, `name`, `parent_id`, `name` AS `path` FROM `categories` '
+            . 'WHERE (`parent_id` IS NULL) '
+            . 'UNION ALL '
+            . 'SELECT `c`.`id`, `c`.`name`, `c`.`parent_id`, '
+            . "CONCAT(`ct`.`path`, ' > ', `c`.`name`) AS `path` "
+            . 'FROM `categories` AS `c` '
+            . 'INNER JOIN `category_tree` AS `ct` ON (`c`.`parent_id` = `ct`.`id`) '
+            . 'ORDER BY `c`.`name` ASC '
+            . ') SELECT `id`, `name`, `path` FROM `category_tree` ORDER BY `path` ASC';
 
-        self::assertSame($expected, $sql);
+        Assert::same($sql, $expected);
     }
 
     public function testCreateStaticMethod(): void
@@ -119,8 +120,8 @@ final class RecursiveCteBuilderTest extends TestCase
         $qb = new QueryBuilder();
         $cte = RecursiveCteBuilder::create($qb, 'TestCTE');
 
-        self::assertInstanceOf(RecursiveCteBuilder::class, $cte);
-        self::assertSame('TestCTE', $cte->getCteName());
+        Assert::instanceOf($cte, RecursiveCteBuilder::class);
+        Assert::same($cte->getCteName(), 'TestCTE');
     }
 
     public function testGetCteNameReturnsCteName(): void
@@ -128,36 +129,7 @@ final class RecursiveCteBuilderTest extends TestCase
         $qb = new QueryBuilder();
         $cte = new RecursiveCteBuilder($qb, 'CategoryTree');
 
-        self::assertSame('CategoryTree', $cte->getCteName());
-    }
-
-    public function testGetQueryIsAliasForBuild(): void
-    {
-        $qb = new QueryBuilder();
-
-        $baseQuery = $qb->subQuery()
-            ->select('id', 'name')
-            ->from('categories')
-            ->where()->isNull('parent_id')->end()
-        ;
-
-        $recursiveQuery = $qb->subQuery()
-            ->select('id', 'name')
-            ->from('categories', 'c')
-        ;
-
-        $finalQuery = $qb->subQuery()->select('*')->from('category_tree');
-
-        $cte = new RecursiveCteBuilder($qb, 'category_tree');
-        $cte->baseQuery($baseQuery)
-            ->recursiveQuery($recursiveQuery)
-            ->finalSelect($finalQuery)
-        ;
-
-        $sql1 = $cte->getQuery(true);
-        $sql2 = $cte->build(true);
-
-        self::assertSame($sql1, $sql2);
+        Assert::same($cte->getCteName(), 'CategoryTree');
     }
 
     public function testBaseQueryThrowsExceptionForNonSelectQuery(): void
@@ -165,8 +137,7 @@ final class RecursiveCteBuilderTest extends TestCase
         $qb = new QueryBuilder();
         $cte = new RecursiveCteBuilder($qb);
 
-        $this->expectException(InvalidQueryException::class);
-        $this->expectExceptionMessage('Base query must be a SELECT statement');
+        Expect::exception(InvalidQueryException::class)->withMessageContaining('Base query must be a SELECT statement');
 
         $insertQuery = $qb->insert('categories')->insertRow(['name' => 'Test']);
         $cte->baseQuery($insertQuery);
@@ -177,8 +148,9 @@ final class RecursiveCteBuilderTest extends TestCase
         $qb = new QueryBuilder();
         $cte = new RecursiveCteBuilder($qb);
 
-        $this->expectException(InvalidQueryException::class);
-        $this->expectExceptionMessage('Recursive query must be a SELECT statement');
+        Expect::exception(InvalidQueryException::class)
+            ->withMessageContaining('Recursive query must be a SELECT statement')
+        ;
 
         $updateQuery = $qb->update('categories')->updateRow(['name' => 'Test']);
         $cte->recursiveQuery($updateQuery);
@@ -189,8 +161,9 @@ final class RecursiveCteBuilderTest extends TestCase
         $qb = new QueryBuilder();
         $cte = new RecursiveCteBuilder($qb);
 
-        $this->expectException(InvalidQueryException::class);
-        $this->expectExceptionMessage('Final query must be a SELECT statement');
+        Expect::exception(InvalidQueryException::class)
+            ->withMessageContaining('Final query must be a SELECT statement')
+        ;
 
         $deleteQuery = $qb->delete('categories');
         $cte->finalSelect($deleteQuery);
@@ -206,8 +179,9 @@ final class RecursiveCteBuilderTest extends TestCase
 
         $cte->recursiveQuery($recursiveQuery)->finalSelect($finalQuery);
 
-        $this->expectException(MissingRequirementException::class);
-        $this->expectExceptionMessage('Base query is required for recursive CTE');
+        Expect::exception(MissingRequirementException::class)
+            ->withMessageContaining('Base query is required for recursive CTE')
+        ;
 
         $cte->build();
     }
@@ -222,8 +196,9 @@ final class RecursiveCteBuilderTest extends TestCase
 
         $cte->baseQuery($baseQuery)->finalSelect($finalQuery);
 
-        $this->expectException(MissingRequirementException::class);
-        $this->expectExceptionMessage('Recursive query is required for recursive CTE');
+        Expect::exception(MissingRequirementException::class)
+            ->withMessageContaining('Recursive query is required for recursive CTE')
+        ;
 
         $cte->build();
     }
@@ -238,8 +213,9 @@ final class RecursiveCteBuilderTest extends TestCase
 
         $cte->baseQuery($baseQuery)->recursiveQuery($recursiveQuery);
 
-        $this->expectException(MissingRequirementException::class);
-        $this->expectExceptionMessage('Final SELECT query is required for recursive CTE');
+        Expect::exception(MissingRequirementException::class)
+            ->withMessageContaining('Final SELECT query is required for recursive CTE')
+        ;
 
         $cte->build();
     }
@@ -268,9 +244,12 @@ final class RecursiveCteBuilderTest extends TestCase
             ->build(true)
         ;
 
-        self::assertStringNotContainsString("\n\n", $sql);
-        self::assertStringContainsString('WITH RECURSIVE', $sql);
-        self::assertStringContainsString('UNION ALL', $sql);
+        Assert::same(
+            $sql,
+            'WITH RECURSIVE `category_tree` AS ( SELECT `id`, `name` FROM `categories` WHERE '
+                . '(`parent_id` IS NULL) UNION ALL SELECT `c`.`id`, `c`.`name` FROM `categories` AS `c` ) '
+                . 'SELECT * FROM `category_tree`'
+        );
     }
 
     public function testConstructorValidatesCteName(): void
@@ -278,6 +257,6 @@ final class RecursiveCteBuilderTest extends TestCase
         $qb = new QueryBuilder();
         $cte = new RecursiveCteBuilder($qb, 'valid_cte_name');
 
-        self::assertSame('valid_cte_name', $cte->getCteName());
+        Assert::same($cte->getCteName(), 'valid_cte_name');
     }
 }

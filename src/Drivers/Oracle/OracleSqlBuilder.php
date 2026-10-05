@@ -13,17 +13,15 @@ use QBuilder\Services\SqlSecurity;
  *
  * Responsible for forming final SQL from query settings
  * taking into account Oracle Database specifics.
+ *
+ * @internal
  */
-class OracleSqlBuilder extends AbstractSqlBuilder
+final class OracleSqlBuilder extends AbstractSqlBuilder
 {
     #[\Override]
     public function buildProcedure(): string
     {
         $procedureName = $this->queryBuilder->getProcedureName();
-
-        if ('' === $procedureName || '0' === $procedureName) {
-            return '';
-        }
 
         $params = $this->queryBuilder->getProcedureParams();
 
@@ -33,13 +31,13 @@ class OracleSqlBuilder extends AbstractSqlBuilder
             $formattedParams[] = $this->driver->formatValue($param);
         }
 
-        $sql = 'BEGIN '.$this->driver->quoteName($procedureName);
+        $sql = 'BEGIN ' . $this->driver->quoteName($procedureName);
 
         if ([] !== $formattedParams) {
-            $sql .= '('.implode(', ', $formattedParams).')';
+            $sql .= '(' . implode(', ', $formattedParams) . ')';
         }
 
-        return $sql.'; END;';
+        return $sql . '; END;';
     }
 
     #[\Override]
@@ -55,7 +53,7 @@ class OracleSqlBuilder extends AbstractSqlBuilder
             fn ($f): string => $this->driver->quoteName(SqlSecurity::validateFieldName($f)),
             $insertFields
         );
-        $sql .= ' ('.implode(', ', $validatedFields).')';
+        $sql .= ' (' . implode(', ', $validatedFields) . ')';
 
         if (1 === \count($insertRows)) {
             $sql .= "\nVALUES ";
@@ -66,7 +64,7 @@ class OracleSqlBuilder extends AbstractSqlBuilder
                 $value = $row[$field] ?? null;
                 $valuePlaceholders[] = $this->driver->formatValue($value);
             }
-            $sql .= '('.implode(', ', $valuePlaceholders).')';
+            $sql .= '(' . implode(', ', $valuePlaceholders) . ')';
         } else {
             $allSelects = [];
 
@@ -79,9 +77,9 @@ class OracleSqlBuilder extends AbstractSqlBuilder
                 }
 
                 $selectPrefix = 0 === $index ? 'SELECT ' : 'UNION ALL SELECT ';
-                $allSelects[] = $selectPrefix.implode(', ', $valuePlaceholders).' FROM DUAL';
+                $allSelects[] = $selectPrefix . implode(', ', $valuePlaceholders) . ' FROM DUAL';
             }
-            $sql .= "\n".implode("\n", $allSelects);
+            $sql .= "\n" . implode("\n", $allSelects);
         }
 
         $mergeData = $this->queryBuilder->getInsertConflictData();
@@ -97,30 +95,30 @@ class OracleSqlBuilder extends AbstractSqlBuilder
     protected function formatField(array $field): string
     {
         if (($field['subqueryObj'] ?? null) instanceof QueryBuilder) {
-            $subquerySql = '('.$field['subqueryObj']->build().')';
+            $subquerySql = '(' . $field['subqueryObj']->build() . ')';
 
             if (! empty($field['alias'])) {
-                $subquerySql .= ' AS '.$this->driver->quoteName($field['alias']);
+                $subquerySql .= ' AS ' . $this->driver->quoteName($field['alias']);
             }
 
             return $subquerySql;
         }
 
-        if ($field['isExpression']) {
+        if (true === $field['isExpression']) {
             $fieldStr = SqlSecurity::escapeIdentifiersInExpression(
                 $field['field'],
                 $this->driver->getIdentifierQuote()
             );
         } else {
             if (! empty($field['table'])) {
-                $fieldStr = $this->driver->quoteName($field['table'].'.'.$field['field']);
+                $fieldStr = $this->driver->quoteName($field['table'] . '.' . $field['field']);
             } else {
                 $fieldStr = $this->driver->quoteName($field['field']);
             }
         }
 
         if (! empty($field['alias'])) {
-            $fieldStr .= ' '.$this->driver->quoteName($field['alias']);
+            $fieldStr .= ' ' . $this->driver->quoteName($field['alias']);
         }
 
         return $fieldStr;

@@ -4,17 +4,18 @@ declare(strict_types=1);
 
 namespace QBuilder\Tests;
 
-use PHPUnit\Framework\TestCase;
 use QBuilder\Condition\Field;
 use QBuilder\Exceptions\InvalidQueryException;
 use QBuilder\QueryBuilder;
+use Testo\Assert;
+use Testo\Expect;
+use Testo\Test;
 
 /**
  * @internal
- *
- * @coversNothing
  */
-final class FieldAdvancedTest extends TestCase
+#[Test]
+final class FieldAdvancedTest
 {
     public function testFieldSubqueryCreatesSubqueryField(): void
     {
@@ -29,10 +30,10 @@ final class FieldAdvancedTest extends TestCase
 
         $field = Field::subquery($subquery, 'order_count');
 
-        self::assertTrue($field->isSubquery());
-        self::assertSame('order_count', $field->getFieldAlias());
-        self::assertTrue($field->isExpression());
-        self::assertSame($subquery, $field->getSubquery());
+        Assert::true($field->isSubquery());
+        Assert::same($field->getFieldAlias(), 'order_count');
+        Assert::true($field->isExpression());
+        Assert::same($field->getSubquery(), $subquery);
     }
 
     public function testFieldSubqueryWithoutAlias(): void
@@ -45,9 +46,9 @@ final class FieldAdvancedTest extends TestCase
 
         $field = Field::subquery($subquery);
 
-        self::assertTrue($field->isSubquery());
-        self::assertSame('', $field->getFieldAlias());
-        self::assertSame($subquery, $field->getSubquery());
+        Assert::true($field->isSubquery());
+        Assert::same($field->getFieldAlias(), '');
+        Assert::same($field->getSubquery(), $subquery);
     }
 
     public function testFieldSubqueryThrowsExceptionForNonSelectQuery(): void
@@ -55,8 +56,7 @@ final class FieldAdvancedTest extends TestCase
         $qb = new QueryBuilder();
         $qb->insert('users')->insertRow(['name' => 'Test']);
 
-        $this->expectException(InvalidQueryException::class);
-        $this->expectExceptionMessage('Subquery must be a SELECT statement');
+        Expect::exception(InvalidQueryException::class)->withMessageContaining('Subquery must be a SELECT statement');
 
         Field::subquery($qb, 'alias');
     }
@@ -65,8 +65,8 @@ final class FieldAdvancedTest extends TestCase
     {
         $field = Field::set('name');
 
-        self::assertFalse($field->isSubquery());
-        self::assertNull($field->getSubquery());
+        Assert::false($field->isSubquery());
+        Assert::null($field->getSubquery());
     }
 
     public function testIsSubqueryReturnsTrueForSubqueryField(): void
@@ -79,7 +79,7 @@ final class FieldAdvancedTest extends TestCase
 
         $field = Field::subquery($subquery);
 
-        self::assertTrue($field->isSubquery());
+        Assert::true($field->isSubquery());
     }
 
     public function testGetSubqueryReturnsQueryBuilderInstance(): void
@@ -92,24 +92,24 @@ final class FieldAdvancedTest extends TestCase
 
         $field = Field::subquery($subquery);
 
-        self::assertInstanceOf(QueryBuilder::class, $field->getSubquery());
-        self::assertSame($subquery, $field->getSubquery());
+        Assert::instanceOf($field->getSubquery(), QueryBuilder::class);
+        Assert::same($field->getSubquery(), $subquery);
     }
 
     public function testGetSubqueryReturnsNullForRegularField(): void
     {
         $field = Field::set('name');
 
-        self::assertNull($field->getSubquery());
+        Assert::null($field->getSubquery());
     }
 
     public function testSetFieldAliasMethod(): void
     {
         $field = Field::set('name');
-        self::assertSame('', $field->getFieldAlias());
+        Assert::same($field->getFieldAlias(), '');
 
         $field->setFieldAlias('user_name');
-        self::assertSame('user_name', $field->getFieldAlias());
+        Assert::same($field->getFieldAlias(), 'user_name');
     }
 
     public function testSetFieldAliasReturnsSelfForChaining(): void
@@ -117,6 +117,6 @@ final class FieldAdvancedTest extends TestCase
         $field = Field::set('name');
         $result = $field->setFieldAlias('alias');
 
-        self::assertSame($field, $result);
+        Assert::same($result, $field);
     }
 }

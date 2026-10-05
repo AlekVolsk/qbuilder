@@ -4,16 +4,19 @@ declare(strict_types=1);
 
 namespace QBuilder\Tests;
 
-use PHPUnit\Framework\TestCase;
+use QBuilder\Exceptions\MissingRequirementException;
 use QBuilder\QbConsts;
 use QBuilder\QueryBuilder;
+use Testo\Assert;
+use Testo\Data\DataProvider;
+use Testo\Expect;
+use Testo\Test;
 
 /**
  * @internal
- *
- * @coversNothing
  */
-final class AbstractSqlBuilderTest extends TestCase
+#[Test]
+final class AbstractSqlBuilderTest
 {
     public function testBuildInsertFromSubquery(): void
     {
@@ -32,9 +35,11 @@ final class AbstractSqlBuilderTest extends TestCase
 
         $sql = $qb->build(true);
 
-        self::assertStringContainsString('INSERT INTO', $sql);
-        self::assertStringContainsString('SELECT', $sql);
-        self::assertStringContainsString('temp_users', $sql);
+        Assert::same(
+            $sql,
+            'INSERT INTO `users` (`name`, `email`) SELECT `name`, `email` FROM `temp_users` WHERE '
+                . '(`verified` = 1)'
+        );
     }
 
     public function testBuildUpdateWithSubquery(): void
@@ -52,11 +57,11 @@ final class AbstractSqlBuilderTest extends TestCase
 
         $sql = $qb->build(true);
 
-        self::assertStringContainsString('UPDATE', $sql);
-        self::assertStringContainsString('SET', $sql);
-        self::assertStringContainsString('WHERE', $sql);
-        self::assertStringContainsString('IN', $sql);
-        self::assertStringContainsString('temp_updates', $sql);
+        Assert::same(
+            $sql,
+            'UPDATE `users` SET `status` = \'verified\' WHERE `id` IN ( SELECT `user_id` FROM '
+                . '`temp_updates` WHERE (`status` = 1) )'
+        );
     }
 
     public function testBuildDeleteWithSubquery(): void
@@ -74,10 +79,11 @@ final class AbstractSqlBuilderTest extends TestCase
 
         $sql = $qb->build(true);
 
-        self::assertStringContainsString('DELETE', $sql);
-        self::assertStringContainsString('WHERE', $sql);
-        self::assertStringContainsString('IN', $sql);
-        self::assertStringContainsString('temp_deletions', $sql);
+        Assert::same(
+            $sql,
+            'DELETE FROM `users` WHERE `id` IN ( SELECT `user_id` FROM `temp_deletions` WHERE '
+                . '(`status` = \'deleted\') )'
+        );
     }
 
     public function testBuildUpdateWithSubqueryWithCustomIdField(): void
@@ -92,8 +98,11 @@ final class AbstractSqlBuilderTest extends TestCase
 
         $sql = $qb->build(true);
 
-        self::assertStringContainsString('`user_id`', $sql);
-        self::assertStringContainsString('IN', $sql);
+        Assert::same(
+            $sql,
+            'UPDATE `users` SET `status` = \'verified\' WHERE `user_id` IN ( SELECT `user_id` FROM '
+                . '`temp_updates` )'
+        );
     }
 
     public function testBuildDeleteWithSubqueryWithCustomIdField(): void
@@ -108,21 +117,7 @@ final class AbstractSqlBuilderTest extends TestCase
 
         $sql = $qb->build(true);
 
-        self::assertStringContainsString('`order_id`', $sql);
-        self::assertStringContainsString('IN', $sql);
-    }
-
-    public function testGetAliasKeywordReturnsAsKeyword(): void
-    {
-        $qb = $this->getQueryBuilder();
-        $sqlBuilder = $qb->getDriverInstance()->getSqlBuilder($qb);
-
-        $reflection = new \ReflectionClass($sqlBuilder);
-        $method = $reflection->getMethod('getAliasKeyword');
-        $method->setAccessible(true);
-        $result = $method->invoke($sqlBuilder);
-
-        self::assertSame(' AS ', $result);
+        Assert::same($sql, 'DELETE FROM `orders` WHERE `order_id` IN ( SELECT `order_id` FROM `temp_deletions` )');
     }
 
     public function testBuildUpdateSetsFormatsUpdateDataCorrectly(): void
@@ -134,10 +129,7 @@ final class AbstractSqlBuilderTest extends TestCase
 
         $sql = $qb->build(true);
 
-        self::assertStringContainsString('SET', $sql);
-        self::assertStringContainsString('`name`', $sql);
-        self::assertStringContainsString('`age`', $sql);
-        self::assertStringContainsString('`active`', $sql);
+        Assert::same($sql, 'UPDATE `users` SET `name` = \'John\', `age` = 30, `active` = 1');
     }
 
     public function testBuildUpdateSetsWithNullValues(): void
@@ -149,8 +141,7 @@ final class AbstractSqlBuilderTest extends TestCase
 
         $sql = $qb->build(true);
 
-        self::assertStringContainsString('`name` = NULL', $sql);
-        self::assertStringContainsString('`age` = 30', $sql);
+        Assert::same($sql, 'UPDATE `users` SET `name` = NULL, `age` = 30');
     }
 
     public function testBuildUpdateSetsWithBooleanValues(): void
@@ -162,7 +153,7 @@ final class AbstractSqlBuilderTest extends TestCase
 
         $sql = $qb->build(true);
 
-        self::assertSame('UPDATE `users` SET `active` = 1, `verified` = 0', $sql);
+        Assert::same($sql, 'UPDATE `users` SET `active` = 1, `verified` = 0');
     }
 
     public function testBuildInsertRowsWithMultipleRows(): void
@@ -175,10 +166,7 @@ final class AbstractSqlBuilderTest extends TestCase
 
         $sql = $qb->build(true);
 
-        self::assertStringContainsString('INSERT INTO', $sql);
-        self::assertStringContainsString('VALUES', $sql);
-        self::assertStringContainsString('John', $sql);
-        self::assertStringContainsString('Jane', $sql);
+        Assert::same($sql, 'INSERT INTO `users` (`name`, `age`) VALUES (\'John\', 30), (\'Jane\', 25)');
     }
 
     public function testBuildInsertRowsWithNullValues(): void
@@ -190,8 +178,10 @@ final class AbstractSqlBuilderTest extends TestCase
 
         $sql = $qb->build(true);
 
-        self::assertStringContainsString('NULL', $sql);
-        self::assertStringContainsString('John', $sql);
+        Assert::same(
+            $sql,
+            'INSERT INTO `users` (`name`, `age`, `email`) VALUES (\'John\', NULL, \'john@example.com\')'
+        );
     }
 
     public function testBuildInsertRowsWithNumericValues(): void
@@ -203,28 +193,59 @@ final class AbstractSqlBuilderTest extends TestCase
 
         $sql = $qb->build(true);
 
-        self::assertStringContainsString('99.99', $sql);
-        self::assertStringContainsString('10', $sql);
+        Assert::same($sql, 'INSERT INTO `products` (`name`, `price`, `quantity`) VALUES (\'Product\', 99.99, 10)');
     }
 
-    public function testBuildInsertWithEmptyDataReturnsBaseSql(): void
+    /**
+     * @param \Closure(QueryBuilder): QueryBuilder $statement
+     * @param non-empty-string                     $message
+     */
+    #[DataProvider('provideStatementWithoutDataIsRejectedCases')]
+    public function testStatementWithoutDataIsRejected(string $driver, \Closure $statement, string $message): void
     {
-        $qb = $this->getQueryBuilder();
-        $qb->insert('users');
+        $qb = $statement(new QueryBuilder($driver));
 
-        $sql = $qb->build(true);
+        Expect::exception(MissingRequirementException::class)->withMessageContaining($message);
 
-        self::assertSame('INSERT INTO `users`', $sql);
+        $qb->build();
     }
 
-    public function testBuildUpdateWithEmptyUpdateDataReturnsBaseSql(): void
+    /**
+     * @return iterable<string, array{string, \Closure(QueryBuilder): QueryBuilder, non-empty-string}>
+     */
+    public static function provideStatementWithoutDataIsRejectedCases(): iterable
     {
-        $qb = $this->getQueryBuilder();
-        $qb->update('users');
+        foreach ([QbConsts::DRIVER_PDO_MYSQL, QbConsts::DRIVER_PGSQL, QbConsts::DRIVER_SQLITE] as $driver) {
+            yield "{$driver}: INSERT without rows" => [
+                $driver,
+                static fn (QueryBuilder $qb): QueryBuilder => $qb->insert('users'),
+                'INSERT needs at least one field',
+            ];
 
-        $sql = $qb->build(true);
+            yield "{$driver}: INSERT of an empty row" => [
+                $driver,
+                static fn (QueryBuilder $qb): QueryBuilder => $qb->insert('users')->insertRow([]),
+                'INSERT needs at least one field',
+            ];
 
-        self::assertSame('UPDATE `users`', $sql);
+            yield "{$driver}: UPDATE without data" => [
+                $driver,
+                static fn (QueryBuilder $qb): QueryBuilder => $qb->update('users')->updateRow([]),
+                'UPDATE needs at least one field',
+            ];
+        }
+
+        yield 'clickhouse: UPDATE without data' => [
+            QbConsts::DRIVER_CLICKHOUSE,
+            static fn (QueryBuilder $qb): QueryBuilder => $qb->update('events'),
+            'UPDATE needs at least one field',
+        ];
+
+        yield 'mssql: INSERT without rows' => [
+            QbConsts::DRIVER_MSSQL,
+            static fn (QueryBuilder $qb): QueryBuilder => $qb->insert('users'),
+            'INSERT needs at least one field',
+        ];
     }
 
     private function getQueryBuilder(): QueryBuilder

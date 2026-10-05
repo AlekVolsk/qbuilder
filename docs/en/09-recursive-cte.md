@@ -41,6 +41,7 @@ use QBuilder\Builder\RecursiveCteBuilder;
 use QBuilder\Condition\ConditionBy;
 use QBuilder\Condition\ConditionJoin;
 use QBuilder\Condition\Field;
+use QBuilder\QueryBuilder;
 
 $qb = new QueryBuilder();
 
@@ -95,6 +96,11 @@ $sql = $cte->baseQuery($baseQuery)
 Building the full path from the root category to each node:
 
 ```php
+use QBuilder\Condition\ConditionBy;
+use QBuilder\Condition\ConditionJoin;
+use QBuilder\Condition\Field;
+use QBuilder\QueryBuilder;
+
 $qb = new QueryBuilder();
 
 // Anchor query: root categories
@@ -142,6 +148,11 @@ $sql = $cte->baseQuery($baseQuery)
 Getting all parent categories for a given category:
 
 ```php
+use QBuilder\Condition\ConditionBy;
+use QBuilder\Condition\ConditionJoin;
+use QBuilder\Condition\Field;
+use QBuilder\QueryBuilder;
+
 $categoryId = 15;
 
 $qb = new QueryBuilder();
@@ -183,6 +194,11 @@ $sql = $cte->baseQuery($baseQuery)
 Getting all child categories for a given category:
 
 ```php
+use QBuilder\Condition\ConditionBy;
+use QBuilder\Condition\ConditionJoin;
+use QBuilder\Condition\Field;
+use QBuilder\QueryBuilder;
+
 $categoryId = 5;
 
 $qb = new QueryBuilder();
@@ -224,6 +240,11 @@ $sql = $cte->baseQuery($baseQuery)
 Building a dependency graph with protection against cycles:
 
 ```php
+use QBuilder\Condition\ConditionBy;
+use QBuilder\Condition\ConditionJoin;
+use QBuilder\Condition\Field;
+use QBuilder\QueryBuilder;
+
 $qb = new QueryBuilder();
 
 // Anchor query: starting nodes with no dependencies

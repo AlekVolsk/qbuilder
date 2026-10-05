@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace QBuilder\Tests;
 
-use PHPUnit\Framework\TestCase;
 use QBuilder\Condition\ConditionBuilder;
 use QBuilder\Condition\ConditionBy;
 use QBuilder\Condition\ConditionJoin;
@@ -12,20 +11,22 @@ use QBuilder\Condition\Field;
 use QBuilder\Exceptions\UnsupportedFeatureException;
 use QBuilder\QbConsts;
 use QBuilder\QueryBuilder;
+use Testo\Assert;
+use Testo\Expect;
+use Testo\Test;
 
 /**
  * @internal
- *
- * @coversNothing
  */
-final class QueryBuilderTest extends TestCase
+#[Test]
+final class QueryBuilderTest
 {
     public function testSelectSimple(): void
     {
         $qb = new QueryBuilder();
         $sql = $qb->select('id', 'name')->from('users')->build(true);
 
-        self::assertSame('SELECT `id`, `name` FROM `users`', $sql);
+        Assert::same($sql, 'SELECT `id`, `name` FROM `users`');
     }
 
     public function testSelectWithAlias(): void
@@ -36,7 +37,7 @@ final class QueryBuilderTest extends TestCase
             ->build(true)
         ;
 
-        self::assertSame('SELECT `id`, `name` AS `user_name` FROM `users`', $sql);
+        Assert::same($sql, 'SELECT `id`, `name` AS `user_name` FROM `users`');
     }
 
     public function testSelectWithTable(): void
@@ -47,7 +48,7 @@ final class QueryBuilderTest extends TestCase
             ->build(true)
         ;
 
-        self::assertSame('SELECT `users`.`id`, `users`.`name` FROM `users`', $sql);
+        Assert::same($sql, 'SELECT `users`.`id`, `users`.`name` FROM `users`');
     }
 
     public function testSelectExpression(): void
@@ -58,7 +59,7 @@ final class QueryBuilderTest extends TestCase
             ->build(true)
         ;
 
-        self::assertSame('SELECT `id`, COUNT(*) AS `total` FROM `users`', $sql);
+        Assert::same($sql, 'SELECT `id`, COUNT(*) AS `total` FROM `users`');
     }
 
     public function testSelectAll(): void
@@ -66,7 +67,7 @@ final class QueryBuilderTest extends TestCase
         $qb = new QueryBuilder();
         $sql = $qb->select('*')->from('users')->build(true);
 
-        self::assertSame('SELECT * FROM `users`', $sql);
+        Assert::same($sql, 'SELECT * FROM `users`');
     }
 
     public function testFromWithAlias(): void
@@ -77,7 +78,7 @@ final class QueryBuilderTest extends TestCase
             ->build(true)
         ;
 
-        self::assertSame('SELECT `u`.`id`, `u`.`name` FROM `users` AS `u`', $sql);
+        Assert::same($sql, 'SELECT `u`.`id`, `u`.`name` FROM `users` AS `u`');
     }
 
     public function testWhereSimple(): void
@@ -89,7 +90,7 @@ final class QueryBuilderTest extends TestCase
             ->build(true)
         ;
 
-        self::assertSame('SELECT * FROM `users` WHERE (`status` = \'active\')', $sql);
+        Assert::same($sql, 'SELECT * FROM `users` WHERE (`status` = \'active\')');
     }
 
     public function testWhereMultiple(): void
@@ -104,7 +105,7 @@ final class QueryBuilderTest extends TestCase
             ->build(true)
         ;
 
-        self::assertSame('SELECT * FROM `users` WHERE (`status` = \'active\') AND (`age` > 18)', $sql);
+        Assert::same($sql, 'SELECT * FROM `users` WHERE (`status` = \'active\') AND (`age` > 18)');
     }
 
     public function testWhereOr(): void
@@ -119,7 +120,7 @@ final class QueryBuilderTest extends TestCase
             ->build(true)
         ;
 
-        self::assertSame('SELECT * FROM `users` WHERE (`status` = \'active\') OR (`status` = \'pending\')', $sql);
+        Assert::same($sql, 'SELECT * FROM `users` WHERE (`status` = \'active\') OR (`status` = \'pending\')');
     }
 
     public function testWhereIn(): void
@@ -131,7 +132,7 @@ final class QueryBuilderTest extends TestCase
             ->build(true)
         ;
 
-        self::assertSame('SELECT * FROM `users` WHERE (`status` IN (\'active\', \'pending\'))', $sql);
+        Assert::same($sql, 'SELECT * FROM `users` WHERE (`status` IN (\'active\', \'pending\'))');
     }
 
     public function testWhereNotIn(): void
@@ -143,7 +144,7 @@ final class QueryBuilderTest extends TestCase
             ->build(true)
         ;
 
-        self::assertSame('SELECT * FROM `users` WHERE (`status` NOT IN (\'banned\', \'deleted\'))', $sql);
+        Assert::same($sql, 'SELECT * FROM `users` WHERE (`status` NOT IN (\'banned\', \'deleted\'))');
     }
 
     public function testWhereBetween(): void
@@ -155,7 +156,7 @@ final class QueryBuilderTest extends TestCase
             ->build(true)
         ;
 
-        self::assertSame('SELECT * FROM `users` WHERE (`age` BETWEEN 18 AND 65)', $sql);
+        Assert::same($sql, 'SELECT * FROM `users` WHERE (`age` BETWEEN 18 AND 65)');
     }
 
     public function testWhereLike(): void
@@ -167,7 +168,7 @@ final class QueryBuilderTest extends TestCase
             ->build(true)
         ;
 
-        self::assertSame('SELECT * FROM `users` WHERE (`name` LIKE \'%John%\')', $sql);
+        Assert::same($sql, 'SELECT * FROM `users` WHERE (`name` LIKE \'%John%\')');
     }
 
     public function testWhereIsNull(): void
@@ -179,7 +180,7 @@ final class QueryBuilderTest extends TestCase
             ->build(true)
         ;
 
-        self::assertSame('SELECT * FROM `users` WHERE (`deleted_at` IS NULL)', $sql);
+        Assert::same($sql, 'SELECT * FROM `users` WHERE (`deleted_at` IS NULL)');
     }
 
     public function testWhereIsNotNull(): void
@@ -191,7 +192,7 @@ final class QueryBuilderTest extends TestCase
             ->build(true)
         ;
 
-        self::assertSame('SELECT * FROM `users` WHERE (`email` IS NOT NULL)', $sql);
+        Assert::same($sql, 'SELECT * FROM `users` WHERE (`email` IS NOT NULL)');
     }
 
     public function testOrderBy(): void
@@ -201,7 +202,7 @@ final class QueryBuilderTest extends TestCase
 
         $sql = $qb->select('*')->from('users')->orderBy($orderBy)->build(true);
 
-        self::assertSame('SELECT * FROM `users` ORDER BY `name` ASC', $sql);
+        Assert::same($sql, 'SELECT * FROM `users` ORDER BY `name` ASC');
     }
 
     public function testOrderByMultiple(): void
@@ -211,7 +212,7 @@ final class QueryBuilderTest extends TestCase
 
         $sql = $qb->select('*')->from('users')->orderBy($orderBy)->build(true);
 
-        self::assertSame('SELECT * FROM `users` ORDER BY `status` ASC, `name` DESC', $sql);
+        Assert::same($sql, 'SELECT * FROM `users` ORDER BY `status` ASC, `name` DESC');
     }
 
     public function testGroupBy(): void
@@ -225,7 +226,7 @@ final class QueryBuilderTest extends TestCase
             ->build(true)
         ;
 
-        self::assertSame('SELECT `status`, COUNT(*) AS `total` FROM `users` GROUP BY `status`', $sql);
+        Assert::same($sql, 'SELECT `status`, COUNT(*) AS `total` FROM `users` GROUP BY `status`');
     }
 
     public function testHaving(): void
@@ -240,11 +241,8 @@ final class QueryBuilderTest extends TestCase
             ->build(true)
         ;
 
-        self::assertSame(
-            'SELECT `status`, COUNT(*) AS `total` FROM `users` '
-            .'GROUP BY `status` HAVING (COUNT(*) > 5)',
-            $sql
-        );
+        Assert::same($sql, 'SELECT `status`, COUNT(*) AS `total` FROM `users` '
+        . 'GROUP BY `status` HAVING (COUNT(*) > 5)');
     }
 
     public function testLimit(): void
@@ -252,7 +250,7 @@ final class QueryBuilderTest extends TestCase
         $qb = new QueryBuilder();
         $sql = $qb->select('*')->from('users')->limit(10)->build(true);
 
-        self::assertSame('SELECT * FROM `users` LIMIT 10', $sql);
+        Assert::same($sql, 'SELECT * FROM `users` LIMIT 10');
     }
 
     public function testLimitOffset(): void
@@ -260,15 +258,16 @@ final class QueryBuilderTest extends TestCase
         $qb = new QueryBuilder();
         $sql = $qb->select('*')->from('users')->limit(10, 20)->build(true);
 
-        self::assertSame('SELECT * FROM `users` LIMIT 20, 10', $sql);
+        Assert::same($sql, 'SELECT * FROM `users` LIMIT 20, 10');
     }
 
     public function testLimitWithTies(): void
     {
         $qb = new QueryBuilder();
 
-        $this->expectException(UnsupportedFeatureException::class);
-        $this->expectExceptionMessage('MySQL does not support LIMIT WITH TIES');
+        Expect::exception(UnsupportedFeatureException::class)
+            ->withMessageContaining('MySQL does not support LIMIT WITH TIES')
+        ;
 
         $qb->select('name', 'salary')
             ->from('employees')
@@ -283,7 +282,7 @@ final class QueryBuilderTest extends TestCase
         $qb = new QueryBuilder();
         $sql = $qb->insert('users')->insertRow(['name' => 'John', 'age' => 30])->build(true);
 
-        self::assertSame('INSERT INTO `users` (`name`, `age`) VALUES (\'John\', 30)', $sql);
+        Assert::same($sql, 'INSERT INTO `users` (`name`, `age`) VALUES (\'John\', 30)');
     }
 
     public function testInsertMultiple(): void
@@ -295,10 +294,7 @@ final class QueryBuilderTest extends TestCase
             ->build(true)
         ;
 
-        self::assertSame(
-            'INSERT INTO `users` (`name`, `age`) VALUES (\'John\', 30), (\'Jane\', 25)',
-            $sql
-        );
+        Assert::same($sql, 'INSERT INTO `users` (`name`, `age`) VALUES (\'John\', 30), (\'Jane\', 25)');
     }
 
     public function testUpdateSimple(): void
@@ -310,7 +306,7 @@ final class QueryBuilderTest extends TestCase
             ->build(true)
         ;
 
-        self::assertSame('UPDATE `users` SET `status` = \'inactive\' WHERE (`id` = 1)', $sql);
+        Assert::same($sql, 'UPDATE `users` SET `status` = \'inactive\' WHERE (`id` = 1)');
     }
 
     public function testDeleteSimple(): void
@@ -318,7 +314,7 @@ final class QueryBuilderTest extends TestCase
         $qb = new QueryBuilder();
         $sql = $qb->delete('users')->where()->eq('id', 1)->end()->build(true);
 
-        self::assertSame('DELETE FROM `users` WHERE (`id` = 1)', $sql);
+        Assert::same($sql, 'DELETE FROM `users` WHERE (`id` = 1)');
     }
 
     public function testInnerJoin(): void
@@ -333,11 +329,8 @@ final class QueryBuilderTest extends TestCase
             ->build(true)
         ;
 
-        self::assertSame(
-            'SELECT `u`.`id`, `u`.`name`, `o`.`total` FROM `users` AS `u` '
-            .'INNER JOIN `orders` AS `o` ON (`o`.`user_id` = `u`.`id`)',
-            $sql
-        );
+        Assert::same($sql, 'SELECT `u`.`id`, `u`.`name`, `o`.`total` FROM `users` AS `u` '
+        . 'INNER JOIN `orders` AS `o` ON (`o`.`user_id` = `u`.`id`)');
     }
 
     public function testLeftJoin(): void
@@ -352,11 +345,8 @@ final class QueryBuilderTest extends TestCase
             ->build(true)
         ;
 
-        self::assertSame(
-            'SELECT `u`.`id`, `u`.`name`, `p`.`phone` FROM `users` AS `u` '
-            .'LEFT JOIN `phones` AS `p` ON (`p`.`user_id` = `u`.`id`)',
-            $sql
-        );
+        Assert::same($sql, 'SELECT `u`.`id`, `u`.`name`, `p`.`phone` FROM `users` AS `u` '
+        . 'LEFT JOIN `phones` AS `p` ON (`p`.`user_id` = `u`.`id`)');
     }
 
     public function testDriverSetting(): void
@@ -364,14 +354,14 @@ final class QueryBuilderTest extends TestCase
         $qb = new QueryBuilder();
         $qb->setDriver(QbConsts::DRIVER_PDO_MYSQL);
 
-        self::assertSame(QbConsts::DRIVER_PDO_MYSQL, $qb->getDriver());
+        Assert::same($qb->getDriver(), QbConsts::DRIVER_PDO_MYSQL);
     }
 
     public function testDriverInvalidThrowsException(): void
     {
         $qb = new QueryBuilder();
 
-        $this->expectException(UnsupportedFeatureException::class);
+        Expect::exception(UnsupportedFeatureException::class);
 
         $qb->setDriver('invalid_driver');
     }
@@ -381,7 +371,7 @@ final class QueryBuilderTest extends TestCase
         $qb = new QueryBuilder();
         $sql = $qb->select('user_id')->distinct()->from('orders')->build(true);
 
-        self::assertSame('SELECT DISTINCT `user_id` FROM `orders`', $sql);
+        Assert::same($sql, 'SELECT DISTINCT `user_id` FROM `orders`');
     }
 
     public function testDistinctWithMultipleFields(): void
@@ -389,7 +379,7 @@ final class QueryBuilderTest extends TestCase
         $qb = new QueryBuilder();
         $sql = $qb->select('user_id', 'product_id')->distinct()->from('orders')->build(true);
 
-        self::assertSame('SELECT DISTINCT `user_id`, `product_id` FROM `orders`', $sql);
+        Assert::same($sql, 'SELECT DISTINCT `user_id`, `product_id` FROM `orders`');
     }
 
     public function testDistinctWithWhere(): void
@@ -400,7 +390,7 @@ final class QueryBuilderTest extends TestCase
             ->build(true)
         ;
 
-        self::assertSame('SELECT DISTINCT `category` FROM `products` WHERE (`status` = \'active\')', $sql);
+        Assert::same($sql, 'SELECT DISTINCT `category` FROM `products` WHERE (`status` = \'active\')');
     }
 
     public function testDistinctWithJoin(): void
@@ -416,11 +406,8 @@ final class QueryBuilderTest extends TestCase
             ->build(true)
         ;
 
-        self::assertSame(
-            'SELECT DISTINCT `o`.`user_id`, `u`.`name` FROM `orders` AS `o` '
-            .'INNER JOIN `users` AS `u` ON (`o`.`user_id` = `u`.`id`)',
-            $sql
-        );
+        Assert::same($sql, 'SELECT DISTINCT `o`.`user_id`, `u`.`name` FROM `orders` AS `o` '
+        . 'INNER JOIN `users` AS `u` ON (`o`.`user_id` = `u`.`id`)');
     }
 
     public function testWhereSimpleWithClosure(): void
@@ -432,7 +419,7 @@ final class QueryBuilderTest extends TestCase
             ->build(true)
         ;
 
-        self::assertSame('SELECT * FROM `users` WHERE (`status` = \'active\')', $sql);
+        Assert::same($sql, 'SELECT * FROM `users` WHERE (`status` = \'active\')');
     }
 
     public function testWhereMultipleWithClosure(): void
@@ -446,7 +433,7 @@ final class QueryBuilderTest extends TestCase
             ->build(true)
         ;
 
-        self::assertSame('SELECT * FROM `users` WHERE (`status` = \'active\') AND (`age` > 18)', $sql);
+        Assert::same($sql, 'SELECT * FROM `users` WHERE (`status` = \'active\') AND (`age` > 18)');
     }
 
     public function testWhereOrWithClosure(): void
@@ -461,7 +448,7 @@ final class QueryBuilderTest extends TestCase
             ->build(true)
         ;
 
-        self::assertSame('SELECT * FROM `users` WHERE (`status` = \'active\') OR (`status` = \'pending\')', $sql);
+        Assert::same($sql, 'SELECT * FROM `users` WHERE (`status` = \'active\') OR (`status` = \'pending\')');
     }
 
     public function testWhereInWithClosure(): void
@@ -473,7 +460,7 @@ final class QueryBuilderTest extends TestCase
             ->build(true)
         ;
 
-        self::assertSame('SELECT * FROM `users` WHERE (`status` IN (\'active\', \'pending\'))', $sql);
+        Assert::same($sql, 'SELECT * FROM `users` WHERE (`status` IN (\'active\', \'pending\'))');
     }
 
     public function testWhereNotInWithClosure(): void
@@ -485,7 +472,7 @@ final class QueryBuilderTest extends TestCase
             ->build(true)
         ;
 
-        self::assertSame('SELECT * FROM `users` WHERE (`status` NOT IN (\'banned\', \'deleted\'))', $sql);
+        Assert::same($sql, 'SELECT * FROM `users` WHERE (`status` NOT IN (\'banned\', \'deleted\'))');
     }
 
     public function testWhereBetweenWithClosure(): void
@@ -497,7 +484,7 @@ final class QueryBuilderTest extends TestCase
             ->build(true)
         ;
 
-        self::assertSame('SELECT * FROM `users` WHERE (`age` BETWEEN 18 AND 65)', $sql);
+        Assert::same($sql, 'SELECT * FROM `users` WHERE (`age` BETWEEN 18 AND 65)');
     }
 
     public function testWhereLikeWithClosure(): void
@@ -509,7 +496,7 @@ final class QueryBuilderTest extends TestCase
             ->build(true)
         ;
 
-        self::assertSame('SELECT * FROM `users` WHERE (`name` LIKE \'%John%\')', $sql);
+        Assert::same($sql, 'SELECT * FROM `users` WHERE (`name` LIKE \'%John%\')');
     }
 
     public function testWhereIsNullWithClosure(): void
@@ -521,7 +508,7 @@ final class QueryBuilderTest extends TestCase
             ->build(true)
         ;
 
-        self::assertSame('SELECT * FROM `users` WHERE (`deleted_at` IS NULL)', $sql);
+        Assert::same($sql, 'SELECT * FROM `users` WHERE (`deleted_at` IS NULL)');
     }
 
     public function testWhereIsNotNullWithClosure(): void
@@ -533,7 +520,7 @@ final class QueryBuilderTest extends TestCase
             ->build(true)
         ;
 
-        self::assertSame('SELECT * FROM `users` WHERE (`email` IS NOT NULL)', $sql);
+        Assert::same($sql, 'SELECT * FROM `users` WHERE (`email` IS NOT NULL)');
     }
 
     public function testWhereAndGroupWithClosure(): void
@@ -551,11 +538,8 @@ final class QueryBuilderTest extends TestCase
             ->build(true)
         ;
 
-        self::assertSame(
-            'SELECT * FROM `users` WHERE (`country` = \'US\') AND '
-            .'((`status` = \'active\') OR (`status` = \'pending\'))',
-            $sql
-        );
+        Assert::same($sql, 'SELECT * FROM `users` WHERE (`country` = \'US\') AND '
+        . '((`status` = \'active\') OR (`status` = \'pending\'))');
     }
 
     public function testWhereOrGroupWithClosure(): void
@@ -573,11 +557,8 @@ final class QueryBuilderTest extends TestCase
             ->build(true)
         ;
 
-        self::assertSame(
-            'SELECT * FROM `users` WHERE (`status` = \'active\') OR '
-            .'((`role` = \'admin\') OR (`role` = \'moderator\'))',
-            $sql
-        );
+        Assert::same($sql, 'SELECT * FROM `users` WHERE (`status` = \'active\') OR '
+        . '((`role` = \'admin\') OR (`role` = \'moderator\'))');
     }
 
     public function testWhereComplexWithClosure(): void
@@ -600,11 +581,8 @@ final class QueryBuilderTest extends TestCase
             ->build(true)
         ;
 
-        self::assertSame(
-            'SELECT * FROM `users` WHERE (`status` = \'active\') AND (`age` > 18) '
-            .'AND ((`country` = \'US\') OR (`country` = \'CA\')) AND (`email` IS NOT NULL)',
-            $sql
-        );
+        Assert::same($sql, 'SELECT * FROM `users` WHERE (`status` = \'active\') AND (`age` > 18) '
+        . 'AND ((`country` = \'US\') OR (`country` = \'CA\')) AND (`email` IS NOT NULL)');
     }
 
     public function testHavingWithClosure(): void
@@ -619,11 +597,8 @@ final class QueryBuilderTest extends TestCase
             ->build(true)
         ;
 
-        self::assertSame(
-            'SELECT `status`, COUNT(*) AS `total` FROM `users` '
-            .'GROUP BY `status` HAVING (COUNT(*) > 5)',
-            $sql
-        );
+        Assert::same($sql, 'SELECT `status`, COUNT(*) AS `total` FROM `users` '
+        . 'GROUP BY `status` HAVING (COUNT(*) > 5)');
     }
 
     public function testHavingComplexWithClosure(): void
@@ -639,11 +614,8 @@ final class QueryBuilderTest extends TestCase
             ->build(true)
         ;
 
-        self::assertSame(
-            'SELECT `status`, COUNT(*) AS `total` FROM `users` '
-            .'GROUP BY `status` HAVING (COUNT(*) > 5) AND (SUM(amount) < 10000)',
-            $sql
-        );
+        Assert::same($sql, 'SELECT `status`, COUNT(*) AS `total` FROM `users` '
+        . 'GROUP BY `status` HAVING (COUNT(*) > 5) AND (SUM(amount) < 10000)');
     }
 
     public function testUpdateWithClosure(): void
@@ -655,7 +627,7 @@ final class QueryBuilderTest extends TestCase
             ->build(true)
         ;
 
-        self::assertSame('UPDATE `users` SET `status` = \'inactive\' WHERE (`id` = 1)', $sql);
+        Assert::same($sql, 'UPDATE `users` SET `status` = \'inactive\' WHERE (`id` = 1)');
     }
 
     public function testDeleteWithClosure(): void
@@ -666,7 +638,7 @@ final class QueryBuilderTest extends TestCase
             ->build(true)
         ;
 
-        self::assertSame('DELETE FROM `users` WHERE (`id` = 1)', $sql);
+        Assert::same($sql, 'DELETE FROM `users` WHERE (`id` = 1)');
     }
 
     public function testWhereNestedGroupsWithClosure(): void
@@ -687,11 +659,8 @@ final class QueryBuilderTest extends TestCase
             ->build(true)
         ;
 
-        self::assertSame(
-            'SELECT * FROM `users` WHERE (`status` = \'active\') AND '
-            .'((`country` = \'US\') OR ((`state` = \'CA\') OR (`state` = \'NY\')))',
-            $sql
-        );
+        Assert::same($sql, 'SELECT * FROM `users` WHERE (`status` = \'active\') AND '
+        . '((`country` = \'US\') OR ((`state` = \'CA\') OR (`state` = \'NY\')))');
     }
 
     public function testMixedSyntaxWhereAndClosure(): void
@@ -711,8 +680,8 @@ final class QueryBuilderTest extends TestCase
             ->build(true)
         ;
 
-        self::assertSame($sql1, $sql2);
-        self::assertSame('SELECT * FROM `users` WHERE (`status` = \'active\')', $sql1);
+        Assert::same($sql2, $sql1);
+        Assert::same($sql1, 'SELECT * FROM `users` WHERE (`status` = \'active\')');
     }
 
     public function testWhereBitmaskWithClosure(): void
@@ -725,11 +694,8 @@ final class QueryBuilderTest extends TestCase
             ->build(true)
         ;
 
-        self::assertSame(
-            'SELECT * FROM `users` WHERE ((`permissions` & 1 = 1) AND '
-            .'(`permissions` & 2 = 2) AND (`permissions` & 4 = 0))',
-            $sql
-        );
+        Assert::same($sql, 'SELECT * FROM `users` WHERE ((`permissions` & 1 = 1) AND '
+        . '(`permissions` & 2 = 2) AND (`permissions` & 4 = 0))');
     }
 
     public function testWhereBitmaskComplexWithClosure(): void
@@ -748,10 +714,7 @@ final class QueryBuilderTest extends TestCase
             ->build(true)
         ;
 
-        self::assertSame(
-            'SELECT * FROM `users` WHERE (`status` = \'active\') AND '
-            .'((`permissions` & 1 = 1) AND (`permissions` & 2 = 2)) AND (`age` > 18)',
-            $sql
-        );
+        Assert::same($sql, 'SELECT * FROM `users` WHERE (`status` = \'active\') AND '
+        . '((`permissions` & 1 = 1) AND (`permissions` & 2 = 2)) AND (`age` > 18)');
     }
 }

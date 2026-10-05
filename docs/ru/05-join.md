@@ -6,6 +6,7 @@
 
 ```php
 use QBuilder\Condition\ConditionJoin;
+use QBuilder\Condition\Field;
 
 $qb->select(
     Field::set('*', 'orders'),
@@ -26,6 +27,9 @@ $qb->select(
 ### JOIN с алиасом
 
 ```php
+use QBuilder\Condition\ConditionJoin;
+use QBuilder\Condition\Field;
+
 $qb->select(
     Field::set('*', 'orders'),
     Field::set('name', 'u', 'user_name')
@@ -45,6 +49,8 @@ $qb->select(
 ### JOIN с несколькими условиями
 
 ```php
+use QBuilder\Condition\ConditionJoin;
+
 $condition = ConditionJoin::create($qb, 'id', 'user_id', 'orders')
     ->and()->eq('status', 'active');
 
@@ -58,6 +64,8 @@ $qb->leftJoin('users', 'u', $condition);
 Поле без таблицы в условии JOIN относится к присоединяемой таблице и получает её алиас (или имя таблицы, если алиаса нет) — во всех СУБД и для любых условий: `eq`, `in`, `like`, `isNull`, `between` и т.д. Поле с таблицей (`'o.user_id'`, `Field::set('user_id', 'o')`, аргумент `targetTable`) остаётся как задано; `raw()` не изменяется.
 
 ```php
+use QBuilder\Condition\ConditionJoin;
+
 $condition = ConditionJoin::create($qb, 'id', 'user_id', 'o')
     ->and()->in('status', ['active', 'trial'])
     ->and()->isNull('deleted_at');
@@ -72,6 +80,8 @@ $qb->select('*')->from('orders', 'o')->innerJoin('users', 'u', $condition);
 ## INNER JOIN
 
 ```php
+use QBuilder\Condition\ConditionJoin;
+
 $qb->innerJoin(
     'orders',
     'o',
@@ -84,6 +94,8 @@ $qb->innerJoin(
 ## RIGHT JOIN
 
 ```php
+use QBuilder\Condition\ConditionJoin;
+
 $qb->rightJoin(
     'orders',
     'o',
@@ -96,6 +108,9 @@ $qb->rightJoin(
 ## Множественные JOIN
 
 ```php
+use QBuilder\Condition\ConditionJoin;
+use QBuilder\Condition\Field;
+
 $qb->select(
     Field::set('*', 'orders'),
     Field::set('name', 'users', 'user_name'),

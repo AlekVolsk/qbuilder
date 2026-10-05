@@ -9,13 +9,16 @@
 - Index hints `USE` / `FORCE` / `IGNORE INDEX`, see [SELECT](02-select.md#index-hints)
 - String escaping by doubling the quote (`''`), see [Security](11-security.md)
 - `excluded()` in upsert: `VALUES(col)`, or the `AS new` row alias for MySQL 8.0.19+ when the server version is set, see [INSERT, UPDATE, DELETE](08-insert-update-delete.md)
+- No `FULL JOIN`: `fullJoin()` and `fullJoinFromSelect()` throw `UnsupportedFeatureException`
 
 ## PostgreSQL Specifics
 
 - `LIMIT count OFFSET offset` syntax
 - `ON CONFLICT DO UPDATE`
 - `FETCH FIRST n ROWS WITH TIES`
-- bool as `TRUE` / `FALSE`
+- bool as `TRUE` / `FALSE` — fits only `boolean` columns, see [Security](11-security.md#value-formatting-by-type)
+- `increment()` / `decrement()` in upsert reference the current value through the INSERT table (`"t"."n" + 1`): an unqualified column is ambiguous with `EXCLUDED`, so the conflict handler needs `insert()` first
+- Strings with a NUL byte are rejected
 - Values with a backslash as `E'...'` — correct with any `standard_conforming_strings`
 
 ## ClickHouse Specifics
@@ -24,6 +27,7 @@
 - `FINAL` modifier - forces a data merge to get up-to-date data
 - `WITH TIES`
 - LIKE is escaped with backslash, without `ESCAPE`
+- UNION without ALL is emitted as `UNION DISTINCT`; `ORDER BY` / `LIMIT` of a UNION wrap it into `SELECT * FROM (...)`
 
 **Example of using FINAL:**
 
@@ -45,7 +49,7 @@ $qb->select('*')
 - `TOP n WITH TIES`
 - `MERGE` instead of `UPSERT`
 - `forceIndex()` → `WITH (INDEX(...))`, see [SELECT](02-select.md#index-hints)
-- `FETCH NEXT n ROWS ONLY`
+- `FETCH NEXT n ROWS ONLY`; a UNION limited without `orderBy()` gets `ORDER BY (SELECT NULL)`
 
 ## Oracle Specifics
 

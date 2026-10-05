@@ -2,6 +2,8 @@
 
 ## INSERT Queries
 
+An INSERT needs at least one field (`insertRow()` with data or `insertFrom()`), an UPDATE needs at least one assignment (`updateRow()`); otherwise `build()` throws `MissingRequirementException` instead of producing an incomplete statement.
+
 ### Inserting a Single Row
 
 ```php
@@ -48,9 +50,14 @@ $qb->insert('users')
 // ON DUPLICATE KEY UPDATE `name` = 'John Updated', `visits` = `visits` + 1
 ```
 
+The conflict handler is built when it is passed to `insertConflictHandler()`, so call `insertRow()` first: MS SQL Server and Oracle build `MERGE` from the rows added so far and throw `MissingRequirementException` without rows or without `conflictTarget()`; PostgreSQL references the INSERT table in `increment()` / `decrement()`.
+
 **Referencing the inserted value — `excluded()`.** The syntax depends on the server: MySQL 8.0.20+ deprecates the `VALUES(col)` function (warning 1287) in favor of the `AS new` row alias (MySQL 8.0.19+), which MariaDB does not have. The builder opens no connection, so the calling code passes the server version:
 
 ```php
+use QBuilder\QbConsts;
+use QBuilder\QueryBuilder;
+
 $qb = new QueryBuilder(QbConsts::DRIVER_PDO_MYSQL);
 $qb->setServerVersion($pdo->getAttribute(PDO::ATTR_SERVER_VERSION));
 

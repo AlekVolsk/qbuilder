@@ -1,5 +1,22 @@
+includes:
+    - vendor/phpstan/phpstan-strict-rules/rules.neon
+    - vendor/spaze/phpstan-disallowed-calls/extension.neon
+    - vendor/shipmonk/dead-code-detector/rules.neon
+
+services:
+    -
+        class: QBuilder\Tools\PHPStan\TestoUsageProvider
+        tags:
+            - shipmonk.deadCode.memberUsageProvider
+    -
+        class: QBuilder\Tools\PHPStan\InterfaceConsumerUsageProvider
+        arguments:
+            testsDir: '%currentWorkingDirectory%/tests'
+        tags:
+            - shipmonk.deadCode.memberUsageProvider
+
 parameters:
-    level: 10
+    level: max
     parallel:
         jobSize: 20
         maximumNumberOfProcesses: 20
@@ -9,9 +26,50 @@ parameters:
     paths:
         - src
         - tests
+        - tools
     checkMaybeUndefinedVariables: true
     checkUninitializedProperties: true
     checkExplicitMixedMissingReturn: true
     reportUnmatchedIgnoredErrors: false
     treatPhpDocTypesAsCertain: false
     phpVersion: 80400
+
+    disallowedFunctionCalls:
+        - function: 'eval()'
+          message: 'eval is an RCE surface'
+        - function: 'exit()'
+          message: 'throw an exception instead'
+        - function: 'die()'
+          message: 'throw an exception instead'
+        - function: 'var_dump()'
+          message: 'debug output must not be committed'
+        - function: 'dump()'
+          message: 'debug output must not be committed'
+
+    shipmonkDeadCode:
+        usageExcluders:
+            tests:
+                enabled: true
+                devPaths:
+                    - '%currentWorkingDirectory%/tests'
+        detect:
+            deadConstants: false
+            deadEnumCases: false
+            deadMethods: true
+
+    strictRules:
+        disallowedEmpty: false
+        strictArrayFilter: false
+        disallowedLooseComparison: true
+        booleansInConditions: true
+        booleansInLoopConditions: true
+        uselessCast: true
+        requireParentConstructorCall: true
+        disallowedImplicitArrayCreation: true
+        disallowedShortTernary: true
+        overwriteVariablesWithLoop: true
+        numericOperandsInArithmeticOperators: true
+        strictFunctionCalls: true
+        dynamicCallOnStaticMethod: true
+        switchConditionsMatchingType: true
+        noVariableVariables: true

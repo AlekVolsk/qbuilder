@@ -4,26 +4,26 @@ declare(strict_types=1);
 
 namespace QBuilder\Tests;
 
-use PHPUnit\Framework\TestCase;
 use QBuilder\Condition\ConditionBy;
 use QBuilder\Condition\ConditionJoin;
 use QBuilder\Condition\Field;
 use QBuilder\QbConsts;
 use QBuilder\QueryBuilder;
+use Testo\Assert;
+use Testo\Test;
 
 /**
  * @internal
- *
- * @coversNothing
  */
-final class OracleDriverTest extends TestCase
+#[Test]
+final class OracleDriverTest
 {
     public function testOracleQuotingUppercase(): void
     {
         $qb = $this->getQueryBuilder();
         $sql = $qb->select('id', 'name')->from('users')->build(true);
 
-        self::assertSame('SELECT "ID", "NAME" FROM "USERS"', $sql);
+        Assert::same($sql, 'SELECT "ID", "NAME" FROM "USERS"');
     }
 
     public function testOracleFetchFirstLimit(): void
@@ -31,7 +31,7 @@ final class OracleDriverTest extends TestCase
         $qb = $this->getQueryBuilder();
         $sql = $qb->select('*')->from('users')->limit(10)->build(true);
 
-        self::assertSame('SELECT * FROM "USERS" FETCH FIRST 10 ROWS ONLY', $sql);
+        Assert::same($sql, 'SELECT * FROM "USERS" FETCH FIRST 10 ROWS ONLY');
     }
 
     public function testOracleFetchFirstWithTies(): void
@@ -44,11 +44,8 @@ final class OracleDriverTest extends TestCase
             ->build(true)
         ;
 
-        self::assertSame(
-            'SELECT "NAME", "SALARY" FROM "EMPLOYEES" '
-            .'ORDER BY "SALARY" DESC FETCH FIRST 5 ROWS WITH TIES',
-            $sql
-        );
+        Assert::same($sql, 'SELECT "NAME", "SALARY" FROM "EMPLOYEES" '
+        . 'ORDER BY "SALARY" DESC FETCH FIRST 5 ROWS WITH TIES');
     }
 
     public function testOracleOffsetFetch(): void
@@ -62,9 +59,9 @@ final class OracleDriverTest extends TestCase
         ;
 
         $expected = 'SELECT * FROM "USERS" ORDER BY "ID" ASC '
-            .'OFFSET 20 ROWS FETCH NEXT 10 ROWS ONLY';
+            . 'OFFSET 20 ROWS FETCH NEXT 10 ROWS ONLY';
 
-        self::assertSame($expected, $sql);
+        Assert::same($sql, $expected);
     }
 
     public function testOracleProcedureNoParams(): void
@@ -72,7 +69,7 @@ final class OracleDriverTest extends TestCase
         $qb = $this->getQueryBuilder();
         $sql = $qb->procedure('get_all_users')->build(true);
 
-        self::assertSame('BEGIN "GET_ALL_USERS"; END;', $sql);
+        Assert::same($sql, 'BEGIN "GET_ALL_USERS"; END;');
     }
 
     public function testOracleProcedureWithParams(): void
@@ -80,7 +77,7 @@ final class OracleDriverTest extends TestCase
         $qb = $this->getQueryBuilder();
         $sql = $qb->procedure('get_user_by_id', [1, 'active'])->build(true);
 
-        self::assertSame("BEGIN \"GET_USER_BY_ID\"(1, 'active'); END;", $sql);
+        Assert::same($sql, "BEGIN \"GET_USER_BY_ID\"(1, 'active'); END;");
     }
 
     public function testOracleMergeUpsert(): void
@@ -98,12 +95,12 @@ final class OracleDriverTest extends TestCase
         ;
 
         $expected = 'MERGE INTO "USERS" target '
-            .'USING (SELECT 1 AS "ID", \'John\' AS "NAME", 30 AS "AGE" FROM DUAL) source '
-            .'ON (target."ID" = source."ID") '
-            .'WHEN MATCHED THEN UPDATE SET "NAME" = \'John Updated\', "AGE" = 31 '
-            .'WHEN NOT MATCHED THEN INSERT ("ID", "NAME", "AGE") VALUES (source."ID", source."NAME", source."AGE")';
+            . 'USING (SELECT 1 AS "ID", \'John\' AS "NAME", 30 AS "AGE" FROM DUAL) source '
+            . 'ON (target."ID" = source."ID") '
+            . 'WHEN MATCHED THEN UPDATE SET "NAME" = \'John Updated\', "AGE" = 31 '
+            . 'WHEN NOT MATCHED THEN INSERT ("ID", "NAME", "AGE") VALUES (source."ID", source."NAME", source."AGE")';
 
-        self::assertSame($expected, $sql);
+        Assert::same($sql, $expected);
     }
 
     public function testOracleInsertSimple(): void
@@ -111,7 +108,7 @@ final class OracleDriverTest extends TestCase
         $qb = $this->getQueryBuilder();
         $sql = $qb->insert('users')->insertRow(['name' => 'John', 'age' => 30])->build(true);
 
-        self::assertSame("INSERT INTO \"USERS\" (\"NAME\", \"AGE\") VALUES ('John', 30)", $sql);
+        Assert::same($sql, "INSERT INTO \"USERS\" (\"NAME\", \"AGE\") VALUES ('John', 30)");
     }
 
     public function testOracleInsertMultipleRows(): void
@@ -124,9 +121,9 @@ final class OracleDriverTest extends TestCase
         ;
 
         $expected = 'INSERT INTO "USERS" ("NAME", "AGE") '
-            ."SELECT 'John', 30 FROM DUAL UNION ALL SELECT 'Jane', 25 FROM DUAL";
+            . "SELECT 'John', 30 FROM DUAL UNION ALL SELECT 'Jane', 25 FROM DUAL";
 
-        self::assertSame($expected, $sql);
+        Assert::same($sql, $expected);
     }
 
     public function testOracleUpdateSimple(): void
@@ -137,7 +134,7 @@ final class OracleDriverTest extends TestCase
             ->build(true)
         ;
 
-        self::assertSame('UPDATE "USERS" SET "STATUS" = \'inactive\' WHERE ("ID" = 1)', $sql);
+        Assert::same($sql, 'UPDATE "USERS" SET "STATUS" = \'inactive\' WHERE ("ID" = 1)');
     }
 
     public function testOracleDeleteSimple(): void
@@ -145,7 +142,7 @@ final class OracleDriverTest extends TestCase
         $qb = $this->getQueryBuilder();
         $sql = $qb->delete('users')->where()->eq('id', 1)->end()->build(true);
 
-        self::assertSame('DELETE FROM "USERS" WHERE ("ID" = 1)', $sql);
+        Assert::same($sql, 'DELETE FROM "USERS" WHERE ("ID" = 1)');
     }
 
     public function testOracleEscapeLikePattern(): void
@@ -157,7 +154,7 @@ final class OracleDriverTest extends TestCase
             ->build(true)
         ;
 
-        self::assertSame("SELECT * FROM \"USERS\" WHERE (\"NAME\" LIKE '50!%%' ESCAPE '!')", $sql);
+        Assert::same($sql, "SELECT * FROM \"USERS\" WHERE (\"NAME\" LIKE '50!%%' ESCAPE '!')");
     }
 
     public function testOracleComplexJoin(): void
@@ -183,13 +180,13 @@ final class OracleDriverTest extends TestCase
         ;
 
         $expected = 'SELECT "U"."ID", "U"."NAME", "O"."TOTAL" '
-            .'FROM "USERS" "U" '
-            .'INNER JOIN "ORDERS" "O" ON ("O"."USER_ID" = "U"."ID") '
-            .'WHERE ("O"."TOTAL" >= 100) '
-            .'ORDER BY "O"."TOTAL" DESC '
-            .'FETCH FIRST 10 ROWS ONLY';
+            . 'FROM "USERS" "U" '
+            . 'INNER JOIN "ORDERS" "O" ON ("O"."USER_ID" = "U"."ID") '
+            . 'WHERE ("O"."TOTAL" >= 100) '
+            . 'ORDER BY "O"."TOTAL" DESC '
+            . 'FETCH FIRST 10 ROWS ONLY';
 
-        self::assertSame($expected, $sql);
+        Assert::same($sql, $expected);
     }
 
     public function testOracleSubqueryInSelect(): void
@@ -208,11 +205,11 @@ final class OracleDriverTest extends TestCase
         ;
 
         $expected = 'SELECT "ID", "NAME", '
-            .'(SELECT COUNT(*) FROM "ORDERS" WHERE ("ORDERS"."USER_ID" = "USERS"."ID")) '
-            .'AS "ORDER_COUNT" '
-            .'FROM "USERS"';
+            . '(SELECT COUNT(*) FROM "ORDERS" WHERE ("ORDERS"."USER_ID" = "USERS"."ID")) '
+            . 'AS "ORDER_COUNT" '
+            . 'FROM "USERS"';
 
-        self::assertSame($expected, $sql);
+        Assert::same($sql, $expected);
     }
 
     public function testOracleWhereExists(): void
@@ -235,10 +232,10 @@ final class OracleDriverTest extends TestCase
         ;
 
         $expected = 'SELECT * FROM "USERS" WHERE (EXISTS '
-            .'(SELECT 1 FROM "ORDERS" WHERE ("ORDERS"."USER_ID" = "USERS"."ID") '
-            .'AND ("TOTAL" >= 1000)))';
+            . '(SELECT 1 FROM "ORDERS" WHERE ("ORDERS"."USER_ID" = "USERS"."ID") '
+            . 'AND ("TOTAL" >= 1000)))';
 
-        self::assertSame($expected, $sql);
+        Assert::same($sql, $expected);
     }
 
     public function testOracleGroupByHaving(): void
@@ -252,9 +249,9 @@ final class OracleDriverTest extends TestCase
         ;
 
         $expected = 'SELECT "STATUS", COUNT(*) "TOTAL" FROM "USERS" '
-            .'GROUP BY "STATUS" HAVING (COUNT(*) > 5)';
+            . 'GROUP BY "STATUS" HAVING (COUNT(*) > 5)';
 
-        self::assertSame($expected, $sql);
+        Assert::same($sql, $expected);
     }
 
     public function testOracleDistinct(): void
@@ -262,7 +259,7 @@ final class OracleDriverTest extends TestCase
         $qb = $this->getQueryBuilder();
         $sql = $qb->select('user_id')->distinct()->from('orders')->build(true);
 
-        self::assertSame('SELECT DISTINCT "USER_ID" FROM "ORDERS"', $sql);
+        Assert::same($sql, 'SELECT DISTINCT "USER_ID" FROM "ORDERS"');
     }
 
     public function testOracleDistinctMultipleFields(): void
@@ -270,7 +267,7 @@ final class OracleDriverTest extends TestCase
         $qb = $this->getQueryBuilder();
         $sql = $qb->select('user_id', 'status')->distinct()->from('orders')->build(true);
 
-        self::assertSame('SELECT DISTINCT "USER_ID", "STATUS" FROM "ORDERS"', $sql);
+        Assert::same($sql, 'SELECT DISTINCT "USER_ID", "STATUS" FROM "ORDERS"');
     }
 
     public function testOracleDistinctWithWhere(): void
@@ -281,7 +278,7 @@ final class OracleDriverTest extends TestCase
             ->build(true)
         ;
 
-        self::assertSame('SELECT DISTINCT "USER_ID" FROM "ORDERS" WHERE ("STATUS" = \'completed\')', $sql);
+        Assert::same($sql, 'SELECT DISTINCT "USER_ID" FROM "ORDERS" WHERE ("STATUS" = \'completed\')');
     }
 
     public function testOracleDistinctWithOrderBy(): void
@@ -293,7 +290,7 @@ final class OracleDriverTest extends TestCase
             ->build(true)
         ;
 
-        self::assertSame('SELECT DISTINCT "CATEGORY" FROM "PRODUCTS" ORDER BY "CATEGORY" ASC', $sql);
+        Assert::same($sql, 'SELECT DISTINCT "CATEGORY" FROM "PRODUCTS" ORDER BY "CATEGORY" ASC');
     }
 
     private function getQueryBuilder(): QueryBuilder

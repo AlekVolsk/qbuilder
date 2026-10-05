@@ -15,8 +15,10 @@ use QBuilder\QueryBuilder;
  *
  * Implements specific SQL query building logic for ClickHouse.
  * ClickHouse is column-oriented DBMS optimized for OLAP queries.
+ *
+ * @internal
  */
-class ClickhouseDriver extends AbstractDriver
+final class ClickhouseDriver extends AbstractDriver
 {
     public function getSqlBuilder(QueryBuilder $queryBuilder): SqlBuilderInterface
     {
@@ -66,12 +68,27 @@ class ClickhouseDriver extends AbstractDriver
         return '';
     }
 
+    #[\Override]
+    public function unionTailAppliesToLastQuery(): bool
+    {
+        return true;
+    }
+
+    /**
+     * A bare UNION is rejected unless the union_default_mode setting is set.
+     */
+    #[\Override]
+    public function unionOperator(bool $all): string
+    {
+        return $all ? 'UNION ALL' : 'UNION DISTINCT';
+    }
+
     public function getLimitSql(int $limit, ?int $offset = null, bool $withTies = false): string
     {
         $sql = "\nLIMIT ";
 
         if (null !== $offset && $offset > 0) {
-            $sql .= $offset.', ';
+            $sql .= $offset . ', ';
         }
 
         $sql .= $limit;
@@ -93,16 +110,12 @@ class ClickhouseDriver extends AbstractDriver
         return false;
     }
 
-    public function getName(): string
-    {
-        return 'clickhouse';
-    }
-
+    // phpcs:ignore SlevomatCodingStandard.Functions.UnusedParameter -- signature from DriverInterface
     public function createConflictBuilder(QueryBuilder $queryBuilder): ConflictBuilderInterface
     {
         throw new UnsupportedFeatureException(
             'ClickHouse does not support conflict handlers (ON DUPLICATE KEY UPDATE / ON CONFLICT). '
-                .'Use ReplacingMergeTree or CollapsingMergeTree engines for data deduplication.'
+                . 'Use ReplacingMergeTree or CollapsingMergeTree engines for data deduplication.'
         );
     }
 

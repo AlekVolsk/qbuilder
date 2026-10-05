@@ -12,8 +12,10 @@ use QBuilder\Exceptions\UnsupportedFeatureException;
  *
  * Responsible for forming final SQL from query settings
  * taking into account SQLite specifics.
+ *
+ * @internal
  */
-class SqliteSqlBuilder extends AbstractSqlBuilder
+final class SqliteSqlBuilder extends AbstractSqlBuilder
 {
     #[\Override]
     public function buildProcedure(): string

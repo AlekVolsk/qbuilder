@@ -41,6 +41,7 @@ use QBuilder\Builder\RecursiveCteBuilder;
 use QBuilder\Condition\ConditionBy;
 use QBuilder\Condition\ConditionJoin;
 use QBuilder\Condition\Field;
+use QBuilder\QueryBuilder;
 
 $qb = new QueryBuilder();
 
@@ -95,6 +96,11 @@ $sql = $cte->baseQuery($baseQuery)
 Построение полного пути от корневой категории до каждого узла:
 
 ```php
+use QBuilder\Condition\ConditionBy;
+use QBuilder\Condition\ConditionJoin;
+use QBuilder\Condition\Field;
+use QBuilder\QueryBuilder;
+
 $qb = new QueryBuilder();
 
 // Якорный запрос: корневые категории
@@ -142,6 +148,11 @@ $sql = $cte->baseQuery($baseQuery)
 Получение всех родительских категорий для заданной категории:
 
 ```php
+use QBuilder\Condition\ConditionBy;
+use QBuilder\Condition\ConditionJoin;
+use QBuilder\Condition\Field;
+use QBuilder\QueryBuilder;
+
 $categoryId = 15;
 
 $qb = new QueryBuilder();
@@ -183,6 +194,11 @@ $sql = $cte->baseQuery($baseQuery)
 Получение всех дочерних категорий для заданной категории:
 
 ```php
+use QBuilder\Condition\ConditionBy;
+use QBuilder\Condition\ConditionJoin;
+use QBuilder\Condition\Field;
+use QBuilder\QueryBuilder;
+
 $categoryId = 5;
 
 $qb = new QueryBuilder();
@@ -224,6 +240,11 @@ $sql = $cte->baseQuery($baseQuery)
 Построение графа зависимостей с защитой от циклов:
 
 ```php
+use QBuilder\Condition\ConditionBy;
+use QBuilder\Condition\ConditionJoin;
+use QBuilder\Condition\Field;
+use QBuilder\QueryBuilder;
+
 $qb = new QueryBuilder();
 
 // Якорный запрос: начальные узлы без зависимостей

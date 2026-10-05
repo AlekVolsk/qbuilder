@@ -4,118 +4,116 @@ declare(strict_types=1);
 
 namespace QBuilder\Tests;
 
-use PHPUnit\Framework\TestCase;
 use QBuilder\Condition\Field;
 use QBuilder\Exceptions\InvalidIdentifierException;
 use QBuilder\QbConsts;
+use Testo\Assert;
+use Testo\Data\DataProvider;
+use Testo\Expect;
+use Testo\Test;
 
 /**
  * @internal
- *
- * @coversNothing
  */
-final class FieldTest extends TestCase
+#[Test]
+final class FieldTest
 {
     public function testFieldSetSimple(): void
     {
         $field = Field::set('name');
 
-        self::assertSame('name', $field->name);
-        self::assertSame('', $field->tableOrAlias);
-        self::assertSame('', $field->getFieldAlias());
-        self::assertFalse($field->isExpression());
+        Assert::same($field->name, 'name');
+        Assert::same($field->tableOrAlias, '');
+        Assert::same($field->getFieldAlias(), '');
+        Assert::false($field->isExpression());
     }
 
     public function testFieldSetWithTable(): void
     {
         $field = Field::set('name', 'users');
 
-        self::assertSame('name', $field->name);
-        self::assertSame('users', $field->tableOrAlias);
-        self::assertSame('', $field->getFieldAlias());
-        self::assertFalse($field->isExpression());
+        Assert::same($field->name, 'name');
+        Assert::same($field->tableOrAlias, 'users');
+        Assert::same($field->getFieldAlias(), '');
+        Assert::false($field->isExpression());
     }
 
     public function testFieldSetWithAlias(): void
     {
         $field = Field::set('name', '', 'user_name');
 
-        self::assertSame('name', $field->name);
-        self::assertSame('', $field->tableOrAlias);
-        self::assertSame('user_name', $field->getFieldAlias());
-        self::assertFalse($field->isExpression());
+        Assert::same($field->name, 'name');
+        Assert::same($field->tableOrAlias, '');
+        Assert::same($field->getFieldAlias(), 'user_name');
+        Assert::false($field->isExpression());
     }
 
     public function testFieldSetWithTableAndAlias(): void
     {
         $field = Field::set('name', 'users', 'user_name');
 
-        self::assertSame('name', $field->name);
-        self::assertSame('users', $field->tableOrAlias);
-        self::assertSame('user_name', $field->getFieldAlias());
-        self::assertFalse($field->isExpression());
+        Assert::same($field->name, 'name');
+        Assert::same($field->tableOrAlias, 'users');
+        Assert::same($field->getFieldAlias(), 'user_name');
+        Assert::false($field->isExpression());
     }
 
     public function testFieldRawExpression(): void
     {
         $field = Field::set('COUNT(*)');
 
-        self::assertSame('COUNT(*)', $field->name);
-        self::assertTrue($field->isExpression());
+        Assert::same($field->name, 'COUNT(*)');
+        Assert::true($field->isExpression());
     }
 
     public function testFieldRawWithAlias(): void
     {
         $field = Field::set('COUNT(*)', '', 'total');
 
-        self::assertSame('COUNT(*)', $field->name);
-        self::assertSame('total', $field->getFieldAlias());
-        self::assertTrue($field->isExpression());
+        Assert::same($field->name, 'COUNT(*)');
+        Assert::same($field->getFieldAlias(), 'total');
+        Assert::true($field->isExpression());
     }
 
     public function testFieldExpressionDetection(): void
     {
         $field1 = Field::set('SUM(amount)');
-        self::assertTrue($field1->isExpression());
+        Assert::true($field1->isExpression());
 
         $field2 = Field::set('COUNT(*)');
-        self::assertTrue($field2->isExpression());
+        Assert::true($field2->isExpression());
 
         $field3 = Field::set('user.name');
-        self::assertFalse($field3->isExpression());
+        Assert::false($field3->isExpression());
 
         $field4 = Field::set('name');
-        self::assertFalse($field4->isExpression());
+        Assert::false($field4->isExpression());
     }
 
     public function testFieldInvalidNameThrowsException(): void
     {
-        $this->expectException(InvalidIdentifierException::class);
-        $this->expectExceptionMessage('Invalid field');
+        Expect::exception(InvalidIdentifierException::class)->withMessageContaining('Invalid field');
 
         Field::set('invalid field');
     }
 
     public function testFieldInvalidTableThrowsException(): void
     {
-        $this->expectException(InvalidIdentifierException::class);
-        $this->expectExceptionMessage('Invalid table/alias');
+        Expect::exception(InvalidIdentifierException::class)->withMessageContaining('Invalid table/alias');
 
         Field::set('name', 'invalid-table');
     }
 
     public function testFieldInvalidAliasThrowsException(): void
     {
-        $this->expectException(InvalidIdentifierException::class);
-        $this->expectExceptionMessage('Invalid alias');
+        Expect::exception(InvalidIdentifierException::class)->withMessageContaining('Invalid alias');
 
         Field::set('name', '', 'invalid-alias');
     }
 
     public function testFieldEmptyNameThrowsException(): void
     {
-        $this->expectException(InvalidIdentifierException::class);
-        $this->expectExceptionMessage('Field name cannot be empty');
+        Expect::exception(InvalidIdentifierException::class)->withMessageContaining('Field name cannot be empty');
 
         Field::set('');
     }
@@ -124,77 +122,93 @@ final class FieldTest extends TestCase
     {
         $field = Field::set('user_id_123', 'table_name_456', 'alias_789');
 
-        self::assertSame('user_id_123', $field->name);
-        self::assertSame('table_name_456', $field->tableOrAlias);
-        self::assertSame('alias_789', $field->getFieldAlias());
+        Assert::same($field->name, 'user_id_123');
+        Assert::same($field->tableOrAlias, 'table_name_456');
+        Assert::same($field->getFieldAlias(), 'alias_789');
     }
 
     public function testFieldAllowsAsterisk(): void
     {
         $field = Field::set('*');
 
-        self::assertSame('*', $field->name);
-        self::assertFalse($field->isExpression());
+        Assert::same($field->name, '*');
+        Assert::false($field->isExpression());
     }
 
     public function testFieldComplexExpression(): void
     {
         $field = Field::set("CONCAT(first_name, ' ', last_name)", '', 'full_name');
 
-        self::assertSame("CONCAT(first_name, ' ', last_name)", $field->name);
-        self::assertSame('full_name', $field->getFieldAlias());
-        self::assertTrue($field->isExpression());
+        Assert::same($field->name, "CONCAT(first_name, ' ', last_name)");
+        Assert::same($field->getFieldAlias(), 'full_name');
+        Assert::true($field->isExpression());
     }
 
     public function testFieldRedetectWithDriver(): void
     {
         $field = Field::set('string_agg(name, \',\')');
 
-        self::assertTrue($field->isExpression());
+        Assert::true($field->isExpression());
 
         $field->redetectWithDriver('mysql');
-        self::assertFalse($field->isExpression());
+        Assert::false($field->isExpression());
 
         $field->redetectWithDriver('pgsql');
-        self::assertTrue($field->isExpression());
+        Assert::true($field->isExpression());
     }
 
     public function testFieldRedetectWithDriverOracle(): void
     {
         $field = Field::set('NVL(price, 0)');
 
-        self::assertTrue($field->isExpression());
+        Assert::true($field->isExpression());
 
         $field->redetectWithDriver('mysql');
-        self::assertFalse($field->isExpression());
+        Assert::false($field->isExpression());
 
         $field->redetectWithDriver('oci');
-        self::assertTrue($field->isExpression());
+        Assert::true($field->isExpression());
     }
 
     public function testFieldRedetectWithDriverMssql(): void
     {
         $field = Field::set('ISNULL(amount, 0)');
 
-        self::assertTrue($field->isExpression());
+        Assert::true($field->isExpression());
 
         $field->redetectWithDriver(QbConsts::DRIVER_MYSQL);
-        self::assertFalse($field->isExpression());
+        Assert::false($field->isExpression());
 
         $field->redetectWithDriver(QbConsts::DRIVER_MSSQL);
-        self::assertTrue($field->isExpression());
+        Assert::true($field->isExpression());
     }
 
     public function testFieldRedetectDoesNotAffectCommonFunctions(): void
     {
         $field = Field::set('COUNT(*)');
 
-        self::assertTrue($field->isExpression());
+        Assert::true($field->isExpression());
 
         $field->redetectWithDriver(QbConsts::DRIVER_POSTGRESQL);
-        self::assertTrue($field->isExpression());
+        Assert::true($field->isExpression());
 
         $field->redetectWithDriver(QbConsts::DRIVER_ORACLE);
-        self::assertTrue($field->isExpression());
+        Assert::true($field->isExpression());
+    }
+
+    #[DataProvider('provideRedetectWithDriverCases')]
+    public function testRedetectWithDriverRecognizesOperatorsAndCase(string $name, bool $expected): void
+    {
+        Assert::same(Field::set($name)->redetectWithDriver(QbConsts::DRIVER_SQLITE)->isExpression(), $expected);
+    }
+
+    /**
+     * @return iterable<string, array{string, bool}>
+     */
+    public static function provideRedetectWithDriverCases(): iterable
+    {
+        yield 'arithmetic' => ['price * qty', true];
+        yield 'CASE' => ['CASE WHEN a > 1 THEN 1 END', true];
+        yield 'plain column' => ['price', false];
     }
 }

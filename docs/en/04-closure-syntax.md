@@ -14,6 +14,8 @@ QueryBuilder supports an alternative syntax using closures, which provides the f
 ### Simple Condition
 
 ```php
+use QBuilder\Condition\ConditionBuilder;
+
 // Standard syntax
 $qb->where()->eq('status', 'active')->end();
 
@@ -24,6 +26,9 @@ $qb->where(static fn (ConditionBuilder $q): ConditionBuilder => $q->eq('status',
 ### Multiple Conditions
 
 ```php
+use QBuilder\Condition\ConditionBuilder;
+use QBuilder\QbConsts;
+
 // Standard syntax
 $qb->where()
     ->eq('status', 'active')
@@ -42,6 +47,8 @@ $qb->where(static fn (ConditionBuilder $q): ConditionBuilder =>
 ### Condition Groups
 
 ```php
+use QBuilder\Condition\ConditionBuilder;
+
 // Standard syntax
 $qb->where()
     ->eq('country', 'US')
@@ -88,6 +95,8 @@ $qb->where(function($q) {
 The alternative syntax also works with `having()`:
 
 ```php
+use QBuilder\Condition\ConditionBuilder;
+
 // Standard syntax
 $qb->having()
     ->gt('COUNT(*)', 5)
@@ -101,6 +110,8 @@ $qb->having(static fn (ConditionBuilder $q): ConditionBuilder => $q->gt('COUNT(*
 ## Complex Example
 
 ```php
+use QBuilder\Condition\ConditionBy;
+
 // Alternative syntax for a complex query
 $qb->select('*')
     ->from('users')

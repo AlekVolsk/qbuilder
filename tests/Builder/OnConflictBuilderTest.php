@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace QBuilder\Tests;
 
-use PHPUnit\Framework\Attributes\DataProvider;
-use PHPUnit\Framework\TestCase;
 use QBuilder\Drivers\Mysql\MysqlDriver;
 use QBuilder\Drivers\Mysql\MysqlOnDuplicateKeyUpdateBuilder;
 use QBuilder\Drivers\Pgsql\PgsqlOnConflictBuilder;
@@ -13,79 +11,76 @@ use QBuilder\Drivers\Sqlite\SqliteOnConflictBuilder;
 use QBuilder\Exceptions\MissingRequirementException;
 use QBuilder\QbConsts;
 use QBuilder\QueryBuilder;
+use Testo\Assert;
+use Testo\Data\DataProvider;
+use Testo\Expect;
+use Testo\Test;
 
 /**
  * @internal
- *
- * @coversNothing
  */
-final class OnConflictBuilderTest extends TestCase
+#[Test]
+final class OnConflictBuilderTest
 {
-    public function testMysqlOnDuplicateKeyUpdateBuilderCreateReturnsInstance(): void
+    public function testMysqlConflictBuilderIsOnDuplicateKeyUpdate(): void
     {
         $qb = new QueryBuilder(QbConsts::DRIVER_PDO_MYSQL);
-        $driver = $qb->getDriverInstance();
-        $builder = MysqlOnDuplicateKeyUpdateBuilder::create($qb, $driver);
+        $builder = $qb->conflictBuilder();
 
-        self::assertInstanceOf(MysqlOnDuplicateKeyUpdateBuilder::class, $builder);
+        Assert::instanceOf($builder, MysqlOnDuplicateKeyUpdateBuilder::class);
     }
 
-    public function testPgsqlOnConflictBuilderCreateReturnsInstance(): void
+    public function testPgsqlConflictBuilderIsOnConflict(): void
     {
         $qb = new QueryBuilder(QbConsts::DRIVER_POSTGRESQL);
-        $driver = $qb->getDriverInstance();
-        $builder = PgsqlOnConflictBuilder::create($qb, $driver);
+        $builder = $qb->conflictBuilder();
 
-        self::assertInstanceOf(PgsqlOnConflictBuilder::class, $builder);
+        Assert::instanceOf($builder, PgsqlOnConflictBuilder::class);
     }
 
-    public function testSqliteOnConflictBuilderCreateReturnsInstance(): void
+    public function testSqliteConflictBuilderIsOnConflict(): void
     {
         $qb = new QueryBuilder(QbConsts::DRIVER_SQLITE);
-        $driver = $qb->getDriverInstance();
-        $builder = SqliteOnConflictBuilder::create($qb, $driver);
+        $builder = $qb->conflictBuilder();
 
-        self::assertInstanceOf(SqliteOnConflictBuilder::class, $builder);
+        Assert::instanceOf($builder, SqliteOnConflictBuilder::class);
     }
 
     public function testMysqlBuildReturnsEmptyStringWhenUpdatesAreEmpty(): void
     {
         $qb = new QueryBuilder(QbConsts::DRIVER_PDO_MYSQL);
-        $driver = $qb->getDriverInstance();
-        $builder = MysqlOnDuplicateKeyUpdateBuilder::create($qb, $driver);
+        $builder = $qb->conflictBuilder();
 
-        self::assertSame('', $builder->build());
+        Assert::same($builder->build(), '');
     }
 
     public function testMysqlBuildGeneratesCorrectOnDuplicateKeyUpdateClause(): void
     {
         $qb = new QueryBuilder(QbConsts::DRIVER_PDO_MYSQL);
-        $driver = $qb->getDriverInstance();
-        $builder = MysqlOnDuplicateKeyUpdateBuilder::create($qb, $driver);
+        $builder = $qb->conflictBuilder();
 
         $sql = $builder->set('name', 'Updated')
             ->increment('views', 1)
             ->build()
         ;
 
-        self::assertStringContainsString('`name` = \'Updated\'', $sql);
-        self::assertStringContainsString('`views` = `views` + 1', $sql);
+        Assert::same($sql, '`name` = \'Updated\', `views` = `views` + 1');
     }
 
     public function testMysqlExcludedUsesValuesFunctionWhenVersionUnknown(): void
     {
         $qb = new QueryBuilder(QbConsts::DRIVER_PDO_MYSQL);
-        $builder = MysqlOnDuplicateKeyUpdateBuilder::create($qb, $qb->getDriverInstance());
+        $builder = $qb->conflictBuilder();
 
-        self::assertSame('`email` = VALUES(`email`)', $builder->excluded('email')->build());
+        Assert::same($builder->excluded('email')->build(), '`email` = VALUES(`email`)');
     }
 
     public function testMysqlExcludedWithDifferentFieldNames(): void
     {
         $qb = new QueryBuilder(QbConsts::DRIVER_PDO_MYSQL);
-        $builder = MysqlOnDuplicateKeyUpdateBuilder::create($qb, $qb->getDriverInstance());
+        $builder = $qb->conflictBuilder();
 
-        self::assertSame('`name` = VALUES(`user_name`)', $builder->excluded('name', 'user_name')->build());
+        Assert::same($builder->excluded('name', 'user_name')->build(), '`name` = VALUES(`user_name`)');
     }
 
     public function testMysqlExcludedUsesRowAliasOnMysql8019(): void
@@ -98,11 +93,8 @@ final class OnConflictBuilderTest extends TestCase
             ->build(true)
         ;
 
-        self::assertSame(
-            "INSERT INTO `u` (`id`, `email`) VALUES (1, 'a') AS `new` "
-                .'ON DUPLICATE KEY UPDATE `email` = `new`.`email`, `n` = `n` + 1',
-            $sql
-        );
+        Assert::same($sql, "INSERT INTO `u` (`id`, `email`) VALUES (1, 'a') AS `new` "
+            . 'ON DUPLICATE KEY UPDATE `email` = `new`.`email`, `n` = `n` + 1');
     }
 
     public function testMysqlExcludedUsesValuesFunctionOnMariadb(): void
@@ -115,9 +107,9 @@ final class OnConflictBuilderTest extends TestCase
             ->build(true)
         ;
 
-        self::assertSame(
-            "INSERT INTO `u` (`id`, `email`) VALUES (1, 'a') ON DUPLICATE KEY UPDATE `email` = VALUES(`email`)",
-            $sql
+        Assert::same(
+            $sql,
+            "INSERT INTO `u` (`id`, `email`) VALUES (1, 'a') ON DUPLICATE KEY UPDATE `email` = VALUES(`email`)"
         );
     }
 
@@ -127,7 +119,7 @@ final class OnConflictBuilderTest extends TestCase
     #[DataProvider('provideMysqlRowAliasSupportByServerVersionCases')]
     public function testMysqlRowAliasSupportByServerVersion(string $version, bool $expected): void
     {
-        self::assertSame($expected, (new MysqlDriver())->setServerVersion($version)->supportsInsertRowAlias());
+        Assert::same((new MysqlDriver())->setServerVersion($version)->supportsInsertRowAlias(), $expected);
     }
 
     /**
@@ -158,57 +150,28 @@ final class OnConflictBuilderTest extends TestCase
         $qb->getDriverInstance();
         $qb->setServerVersion('8.0.45');
 
-        self::assertSame('8.0.45', $qb->getDriverInstance()->getServerVersion());
-        self::assertSame('8.0.45', $qb->subQuery()->getDriverInstance()->getServerVersion());
+        Assert::same($qb->getDriverInstance()->getServerVersion(), '8.0.45');
+        Assert::same($qb->subQuery()->getDriverInstance()->getServerVersion(), '8.0.45');
     }
 
     public function testMysqlConflictTargetDoesNothing(): void
     {
         $qb = new QueryBuilder(QbConsts::DRIVER_PDO_MYSQL);
-        $driver = $qb->getDriverInstance();
-        $builder = MysqlOnDuplicateKeyUpdateBuilder::create($qb, $driver);
+        $builder = $qb->conflictBuilder();
 
         $result = $builder->conflictTarget(['email']);
 
-        self::assertSame($builder, $result);
-    }
-
-    public function testMysqlBuildConflictClauseReturnsEmptyString(): void
-    {
-        $qb = new QueryBuilder(QbConsts::DRIVER_PDO_MYSQL);
-        $driver = $qb->getDriverInstance();
-        $builder = MysqlOnDuplicateKeyUpdateBuilder::create($qb, $driver);
-
-        $reflection = new \ReflectionClass($builder);
-        $method = $reflection->getMethod('buildConflictClause');
-        $method->setAccessible(true);
-        $result = $method->invoke($builder);
-
-        self::assertSame('', $result);
-    }
-
-    public function testMysqlBuildUpdatePrefixReturnsOnDuplicateKeyUpdate(): void
-    {
-        $qb = new QueryBuilder(QbConsts::DRIVER_PDO_MYSQL);
-        $driver = $qb->getDriverInstance();
-        $builder = MysqlOnDuplicateKeyUpdateBuilder::create($qb, $driver);
-
-        $reflection = new \ReflectionClass($builder);
-        $method = $reflection->getMethod('buildUpdatePrefix');
-        $method->setAccessible(true);
-        $result = $method->invoke($builder);
-
-        self::assertSame('ON DUPLICATE KEY UPDATE', $result);
+        Assert::same($result, $builder);
     }
 
     public function testPgsqlBuildThrowsExceptionWhenConflictTargetNotSet(): void
     {
         $qb = new QueryBuilder(QbConsts::DRIVER_POSTGRESQL);
-        $driver = $qb->getDriverInstance();
-        $builder = PgsqlOnConflictBuilder::create($qb, $driver);
+        $builder = $qb->conflictBuilder();
 
-        $this->expectException(MissingRequirementException::class);
-        $this->expectExceptionMessage('Conflict target must be specified for PostgreSQL ON CONFLICT');
+        Expect::exception(MissingRequirementException::class)
+            ->withMessageContaining('Conflict target must be specified for PostgreSQL ON CONFLICT')
+        ;
 
         $builder->set('name', 'Updated')->build();
     }
@@ -216,96 +179,71 @@ final class OnConflictBuilderTest extends TestCase
     public function testPgsqlBuildGeneratesCorrectOnConflictClause(): void
     {
         $qb = new QueryBuilder(QbConsts::DRIVER_POSTGRESQL);
-        $driver = $qb->getDriverInstance();
-        $builder = PgsqlOnConflictBuilder::create($qb, $driver);
+        $builder = $qb->conflictBuilder();
 
         $sql = $builder->conflictTarget(['email'])
             ->set('name', 'Updated')
-            ->increment('views', 1)
             ->build()
         ;
 
-        self::assertStringContainsString('ON CONFLICT ("email")', $sql);
-        self::assertStringContainsString('DO UPDATE SET', $sql);
-        self::assertStringContainsString('"name" = \'Updated\'', $sql);
-        self::assertStringContainsString('"views" = "views" + 1', $sql);
+        Assert::same($sql, "\nON CONFLICT (\"email\")\nDO UPDATE SET \"name\" = 'Updated'");
     }
 
     public function testPgsqlBuildReturnsDoNothingWhenUpdatesAreEmpty(): void
     {
         $qb = new QueryBuilder(QbConsts::DRIVER_POSTGRESQL);
-        $driver = $qb->getDriverInstance();
-        $builder = PgsqlOnConflictBuilder::create($qb, $driver);
+        $builder = $qb->conflictBuilder();
 
         $sql = $builder->conflictTarget(['email'])
             ->build()
         ;
 
-        self::assertStringContainsString('ON CONFLICT ("email") DO NOTHING', $sql);
+        Assert::same($sql, "\nON CONFLICT (\"email\") DO NOTHING");
     }
 
     public function testPgsqlExcludedUsesExcludedKeyword(): void
     {
         $qb = new QueryBuilder(QbConsts::DRIVER_POSTGRESQL);
-        $driver = $qb->getDriverInstance();
-        $builder = PgsqlOnConflictBuilder::create($qb, $driver);
+        $builder = $qb->conflictBuilder();
 
         $sql = $builder->conflictTarget(['email'])
             ->excluded('email')
             ->build()
         ;
 
-        self::assertStringContainsString('EXCLUDED."email"', $sql);
+        Assert::same($sql, "\nON CONFLICT (\"email\")\nDO UPDATE SET \"email\" = EXCLUDED.\"email\"");
     }
 
     public function testPgsqlExcludedWithDifferentFieldNames(): void
     {
         $qb = new QueryBuilder(QbConsts::DRIVER_POSTGRESQL);
-        $driver = $qb->getDriverInstance();
-        $builder = PgsqlOnConflictBuilder::create($qb, $driver);
+        $builder = $qb->conflictBuilder();
 
         $sql = $builder->conflictTarget(['email'])
             ->excluded('name', 'user_name')
             ->build()
         ;
 
-        self::assertStringContainsString('EXCLUDED."user_name"', $sql);
+        Assert::same($sql, "\nON CONFLICT (\"email\")\nDO UPDATE SET \"name\" = EXCLUDED.\"user_name\"");
     }
 
     public function testPgsqlConflictTargetWithMultipleFields(): void
     {
         $qb = new QueryBuilder(QbConsts::DRIVER_POSTGRESQL);
-        $driver = $qb->getDriverInstance();
-        $builder = PgsqlOnConflictBuilder::create($qb, $driver);
+        $builder = $qb->conflictBuilder();
 
         $sql = $builder->conflictTarget(['user_id', 'product_id'])
             ->set('quantity', 10)
             ->build()
         ;
 
-        self::assertStringContainsString('ON CONFLICT ("user_id", "product_id")', $sql);
-    }
-
-    public function testPgsqlBuildConflictClauseThrowsExceptionWhenConflictTargetsAreEmpty(): void
-    {
-        $qb = new QueryBuilder(QbConsts::DRIVER_POSTGRESQL);
-        $driver = $qb->getDriverInstance();
-        $builder = PgsqlOnConflictBuilder::create($qb, $driver);
-
-        $this->expectException(MissingRequirementException::class);
-        $this->expectExceptionMessage('PostgreSQL ON CONFLICT requires conflict target fields');
-
-        $reflection = new \ReflectionClass($builder);
-        $method = $reflection->getMethod('buildConflictClause');
-        $method->setAccessible(true);
-        $method->invoke($builder);
+        Assert::same($sql, "\nON CONFLICT (\"user_id\", \"product_id\")\nDO UPDATE SET \"quantity\" = 10");
     }
 
     public function testSqliteBuildGeneratesCorrectOnConflictClause(): void
     {
         $qb = new QueryBuilder(QbConsts::DRIVER_SQLITE);
-        $driver = $qb->getDriverInstance();
-        $builder = SqliteOnConflictBuilder::create($qb, $driver);
+        $builder = $qb->conflictBuilder();
 
         $sql = $builder->conflictTarget(['email'])
             ->set('name', 'Updated')
@@ -313,87 +251,76 @@ final class OnConflictBuilderTest extends TestCase
             ->build()
         ;
 
-        self::assertStringContainsString('ON CONFLICT ("email")', $sql);
-        self::assertStringContainsString('DO UPDATE SET', $sql);
-        self::assertStringContainsString('"name" = \'Updated\'', $sql);
-        self::assertStringContainsString('"views" = "views" + 1', $sql);
+        Assert::same($sql, "\nON CONFLICT (\"email\")\nDO UPDATE SET \"name\" = 'Updated', \"views\" = \"views\" + 1");
     }
 
     public function testSqliteBuildWithEmptyConflictTargets(): void
     {
         $qb = new QueryBuilder(QbConsts::DRIVER_SQLITE);
-        $driver = $qb->getDriverInstance();
-        $builder = SqliteOnConflictBuilder::create($qb, $driver);
+        $builder = $qb->conflictBuilder();
 
         $sql = $builder->set('name', 'Updated')
             ->build()
         ;
 
-        self::assertStringContainsString('ON CONFLICT', $sql);
-        self::assertStringContainsString('DO UPDATE SET', $sql);
-        self::assertStringNotContainsString('ON CONFLICT ("', $sql);
+        Assert::same($sql, "\nON CONFLICT\nDO UPDATE SET \"name\" = 'Updated'");
     }
 
     public function testSqliteExcludedUsesExcludedKeyword(): void
     {
         $qb = new QueryBuilder(QbConsts::DRIVER_SQLITE);
-        $driver = $qb->getDriverInstance();
-        $builder = SqliteOnConflictBuilder::create($qb, $driver);
+        $builder = $qb->conflictBuilder();
 
         $sql = $builder->conflictTarget(['email'])
             ->excluded('email')
             ->build()
         ;
 
-        self::assertStringContainsString('EXCLUDED."email"', $sql);
+        Assert::same($sql, "\nON CONFLICT (\"email\")\nDO UPDATE SET \"email\" = EXCLUDED.\"email\"");
     }
 
     public function testSqliteExcludedWithDifferentFieldNames(): void
     {
         $qb = new QueryBuilder(QbConsts::DRIVER_SQLITE);
-        $driver = $qb->getDriverInstance();
-        $builder = SqliteOnConflictBuilder::create($qb, $driver);
+        $builder = $qb->conflictBuilder();
 
         $sql = $builder->conflictTarget(['email'])
             ->excluded('name', 'user_name')
             ->build()
         ;
 
-        self::assertStringContainsString('EXCLUDED."user_name"', $sql);
+        Assert::same($sql, "\nON CONFLICT (\"email\")\nDO UPDATE SET \"name\" = EXCLUDED.\"user_name\"");
     }
 
     public function testSqliteConflictTargetWithMultipleFields(): void
     {
         $qb = new QueryBuilder(QbConsts::DRIVER_SQLITE);
-        $driver = $qb->getDriverInstance();
-        $builder = SqliteOnConflictBuilder::create($qb, $driver);
+        $builder = $qb->conflictBuilder();
 
         $sql = $builder->conflictTarget(['user_id', 'product_id'])
             ->set('quantity', 10)
             ->build()
         ;
 
-        self::assertStringContainsString('ON CONFLICT ("user_id", "product_id")', $sql);
+        Assert::same($sql, "\nON CONFLICT (\"user_id\", \"product_id\")\nDO UPDATE SET \"quantity\" = 10");
     }
 
     public function testExpressionMethod(): void
     {
         $qb = new QueryBuilder(QbConsts::DRIVER_PDO_MYSQL);
-        $driver = $qb->getDriverInstance();
-        $builder = MysqlOnDuplicateKeyUpdateBuilder::create($qb, $driver);
+        $builder = $qb->conflictBuilder();
 
         $sql = $builder->expression('price', 'price * 1.1')
             ->build()
         ;
 
-        self::assertStringContainsString('`price` = price * 1.1', $sql);
+        Assert::same($sql, '`price` = price * 1.1');
     }
 
     public function testCaseExpressionMethod(): void
     {
         $qb = new QueryBuilder(QbConsts::DRIVER_PDO_MYSQL);
-        $driver = $qb->getDriverInstance();
-        $builder = MysqlOnDuplicateKeyUpdateBuilder::create($qb, $driver);
+        $builder = $qb->conflictBuilder();
 
         $sql = $builder->caseExpression('status', [
             'WHEN count > 10 THEN \'active\'',
@@ -402,114 +329,104 @@ final class OnConflictBuilderTest extends TestCase
             ->build()
         ;
 
-        self::assertStringContainsString('CASE', $sql);
-        self::assertStringContainsString('WHEN count > 10 THEN \'active\'', $sql);
-        self::assertStringContainsString('ELSE \'pending\'', $sql);
+        Assert::same($sql, '`status` = CASE WHEN count > 10 THEN \'active\' ELSE \'pending\' END');
     }
 
     public function testSetWithNullValue(): void
     {
         $qb = new QueryBuilder(QbConsts::DRIVER_PDO_MYSQL);
-        $driver = $qb->getDriverInstance();
-        $builder = MysqlOnDuplicateKeyUpdateBuilder::create($qb, $driver);
+        $builder = $qb->conflictBuilder();
 
         $sql = $builder->set('name', null)
             ->build()
         ;
 
-        self::assertStringContainsString('`name` = NULL', $sql);
+        Assert::same($sql, '`name` = NULL');
     }
 
     public function testSetWithBooleanValues(): void
     {
         $qb = new QueryBuilder(QbConsts::DRIVER_PDO_MYSQL);
-        $driver = $qb->getDriverInstance();
-        $builder = MysqlOnDuplicateKeyUpdateBuilder::create($qb, $driver);
+        $builder = $qb->conflictBuilder();
 
         $sql = $builder->set('active', true)
             ->build()
         ;
 
-        self::assertStringContainsString('`active` = 1', $sql);
+        Assert::same($sql, '`active` = 1');
 
-        $builder2 = MysqlOnDuplicateKeyUpdateBuilder::create($qb, $driver);
+        $builder2 = $qb->conflictBuilder();
         $sql2 = $builder2->set('active', false)
             ->build()
         ;
 
-        self::assertStringContainsString('`active` = 0', $sql2);
+        Assert::same($sql2, '`active` = 0');
     }
 
     public function testSetWithNumericValues(): void
     {
         $qb = new QueryBuilder(QbConsts::DRIVER_PDO_MYSQL);
-        $driver = $qb->getDriverInstance();
-        $builder = MysqlOnDuplicateKeyUpdateBuilder::create($qb, $driver);
+        $builder = $qb->conflictBuilder();
 
         $sql = $builder->set('age', 25)
             ->build()
         ;
 
-        self::assertStringContainsString('`age` = 25', $sql);
+        Assert::same($sql, '`age` = 25');
     }
 
     public function testIncrementMethod(): void
     {
         $qb = new QueryBuilder(QbConsts::DRIVER_PDO_MYSQL);
-        $driver = $qb->getDriverInstance();
-        $builder = MysqlOnDuplicateKeyUpdateBuilder::create($qb, $driver);
+        $builder = $qb->conflictBuilder();
 
         $sql = $builder->increment('views', 1)
             ->build()
         ;
 
-        self::assertStringContainsString('`views` = `views` + 1', $sql);
+        Assert::same($sql, '`views` = `views` + 1');
     }
 
     public function testDecrementMethod(): void
     {
         $qb = new QueryBuilder(QbConsts::DRIVER_PDO_MYSQL);
-        $driver = $qb->getDriverInstance();
-        $builder = MysqlOnDuplicateKeyUpdateBuilder::create($qb, $driver);
+        $builder = $qb->conflictBuilder();
 
         $sql = $builder->decrement('balance', 10)
             ->build()
         ;
 
-        self::assertStringContainsString('`balance` = `balance` - 10', $sql);
+        Assert::same($sql, '`balance` = `balance` - 10');
     }
 
     public function testSetNullMethod(): void
     {
         $qb = new QueryBuilder(QbConsts::DRIVER_PDO_MYSQL);
-        $driver = $qb->getDriverInstance();
-        $builder = MysqlOnDuplicateKeyUpdateBuilder::create($qb, $driver);
+        $builder = $qb->conflictBuilder();
 
         $sql = $builder->setNull('name')
             ->build()
         ;
 
-        self::assertStringContainsString('`name` = NULL', $sql);
+        Assert::same($sql, '`name` = NULL');
     }
 
     public function testSqlFunctionMethod(): void
     {
         $qb = new QueryBuilder(QbConsts::DRIVER_PDO_MYSQL);
-        $driver = $qb->getDriverInstance();
-        $builder = MysqlOnDuplicateKeyUpdateBuilder::create($qb, $driver);
+        $builder = $qb->conflictBuilder();
 
         $sql = $builder->sqlFunction('updated_at', 'NOW()')
             ->build()
         ;
 
-        self::assertStringContainsString('`updated_at` = NOW()', $sql);
+        Assert::same($sql, '`updated_at` = NOW()');
     }
 
     public function testMultipleUpdateOperations(): void
     {
         $qb = new QueryBuilder(QbConsts::DRIVER_PDO_MYSQL);
-        $driver = $qb->getDriverInstance();
-        $builder = MysqlOnDuplicateKeyUpdateBuilder::create($qb, $driver);
+        $builder = $qb->conflictBuilder();
 
         $sql = $builder->set('name', 'Updated')
             ->increment('views', 1)
@@ -517,8 +434,6 @@ final class OnConflictBuilderTest extends TestCase
             ->build()
         ;
 
-        self::assertStringContainsString('`name` = \'Updated\'', $sql);
-        self::assertStringContainsString('`views` = `views` + 1', $sql);
-        self::assertStringContainsString('`updated_at` = NOW()', $sql);
+        Assert::same($sql, '`name` = \'Updated\', `views` = `views` + 1, `updated_at` = NOW()');
     }
 }

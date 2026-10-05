@@ -31,6 +31,8 @@ use QBuilder\Services\SqlCompactor;
  *     ->orderBy(ConditionBy::orderBy()->desc('created_at'))
  *     ->limit(100)
  *     ->build();
+ *
+ * @api
  */
 class UnionBuilder
 {
@@ -137,29 +139,27 @@ class UnionBuilder
             return $this->queries[0];
         }
 
-        $unionOperator = $this->useUnionAll ? "\nUNION ALL\n" : "\nUNION\n";
-        $sql = implode($unionOperator, $this->queries);
+        $driver = $this->getDriverInstance();
+        $sql = implode("\n" . $driver->unionOperator($this->useUnionAll) . "\n", $this->queries);
+        $hasTail = [] !== $this->orderBy || null !== $this->limitValue;
 
-        if ([] !== $this->orderBy || null !== $this->limitValue || null !== $this->offsetValue) {
-            $sql = '('.$sql.')';
+        if ($hasTail && $driver->unionTailAppliesToLastQuery()) {
+            $sql = "SELECT *\nFROM (\n" . $sql . "\n)";
         }
 
         if ([] !== $this->orderBy) {
-            $driver = $this->getDriverInstance();
             $orders = [];
 
             foreach ($this->orderBy as $order) {
-                $orders[] = $driver->quoteName($order['field']).' '.$order['direction'];
+                $orders[] = $driver->quoteName($order['field']) . ' ' . $order['direction'];
             }
-            $sql .= "\nORDER BY ".implode(', ', $orders);
+            $sql .= "\nORDER BY " . implode(', ', $orders);
+        } elseif (null !== $this->limitValue && $driver->limitRequiresOrderBy()) {
+            $sql .= "\nORDER BY (SELECT NULL)";
         }
 
         if (null !== $this->limitValue) {
-            $sql .= "\nLIMIT ".$this->limitValue;
-        }
-
-        if (null !== $this->offsetValue) {
-            $sql .= "\nOFFSET ".$this->offsetValue;
+            $sql .= $driver->getLimitSql($this->limitValue, $this->offsetValue);
         }
 
         if ($compact) {

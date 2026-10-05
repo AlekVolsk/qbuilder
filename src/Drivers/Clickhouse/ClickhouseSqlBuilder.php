@@ -20,8 +20,10 @@ use QBuilder\Services\SqlSecurity;
  * - No ON DUPLICATE KEY UPDATE / ON CONFLICT
  * - No stored procedures
  * - LIMIT offset, count (different syntax)
+ *
+ * @internal
  */
-class ClickhouseSqlBuilder extends AbstractSqlBuilder
+final class ClickhouseSqlBuilder extends AbstractSqlBuilder
 {
     #[\Override]
     public function buildUpdate(): string
@@ -29,41 +31,37 @@ class ClickhouseSqlBuilder extends AbstractSqlBuilder
         $fromTable = $this->queryBuilder->getFromTable();
         $updateData = $this->queryBuilder->getUpdateData();
 
-        if ([] === $updateData) {
-            throw new UnsupportedFeatureException('UPDATE requires data to update');
-        }
-
-        $sql = 'ALTER TABLE '.$this->driver->quoteName($fromTable)
-            ."\nUPDATE ".$this->buildUpdateSets($updateData);
+        $sql = 'ALTER TABLE ' . $this->driver->quoteName($fromTable)
+            . "\nUPDATE " . $this->buildUpdateSets($updateData);
 
         $whereClause = $this->buildWhereClause();
 
         if ('' === $whereClause) {
             throw new UnsupportedFeatureException(
                 'ClickHouse ALTER TABLE UPDATE requires WHERE clause for safety. '
-                    .'This is a slow mutation operation, not suitable for frequent updates.'
+                    . 'This is a slow mutation operation, not suitable for frequent updates.'
             );
         }
 
-        return $sql.$whereClause;
+        return $sql . $whereClause;
     }
 
     #[\Override]
     public function buildDelete(): string
     {
         $fromTable = $this->queryBuilder->getFromTable();
-        $sql = 'ALTER TABLE '.$this->driver->quoteName($fromTable)."\nDELETE";
+        $sql = 'ALTER TABLE ' . $this->driver->quoteName($fromTable) . "\nDELETE";
 
         $whereClause = $this->buildWhereClause();
 
         if ('' === $whereClause) {
             throw new UnsupportedFeatureException(
                 'ClickHouse ALTER TABLE DELETE requires WHERE clause for safety. '
-                    .'This is a slow mutation operation, not suitable for frequent deletes.'
+                    . 'This is a slow mutation operation, not suitable for frequent deletes.'
             );
         }
 
-        return $sql.$whereClause;
+        return $sql . $whereClause;
     }
 
     #[\Override]
@@ -96,7 +94,7 @@ class ClickhouseSqlBuilder extends AbstractSqlBuilder
         $fromAlias = $this->queryBuilder->getFromAlias();
 
         if ('' !== $fromAlias && '0' !== $fromAlias) {
-            $sql .= ' AS '.$this->driver->quoteName($fromAlias);
+            $sql .= ' AS ' . $this->driver->quoteName($fromAlias);
         }
 
         return $sql;
@@ -109,7 +107,7 @@ class ClickhouseSqlBuilder extends AbstractSqlBuilder
             fn ($f): string => $this->driver->quoteName(SqlSecurity::validateFieldName($f)),
             $insertFields
         );
-        $sql .= ' ('.implode(', ', $validatedFields).')';
+        $sql .= ' (' . implode(', ', $validatedFields) . ')';
         $sql .= "\nVALUES ";
 
         $allRows = [];
@@ -121,7 +119,7 @@ class ClickhouseSqlBuilder extends AbstractSqlBuilder
                 $value = $row[$field] ?? null;
                 $valuePlaceholders[] = $this->driver->formatValue($value);
             }
-            $allRows[] = '('.implode(', ', $valuePlaceholders).')';
+            $allRows[] = '(' . implode(', ', $valuePlaceholders) . ')';
         }
 
         $sql .= implode(",\n", $allRows);

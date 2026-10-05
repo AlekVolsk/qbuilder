@@ -3,8 +3,10 @@
 ## Пример 1: Отчет по заказам с подзапросами
 
 ```php
-use QBuilder\Condition\Field;
 use QBuilder\Condition\ConditionBy;
+use QBuilder\Condition\Field;
+use QBuilder\QbConsts;
+use QBuilder\QueryBuilder;
 
 $qb = new QueryBuilder(QbConsts::DRIVER_PDO_MYSQL);
 
@@ -130,15 +132,17 @@ $sql = $qb->select(
 
 ```php
 use QBuilder\Builder\UnionBuilder;
+use QBuilder\Condition\ConditionBy;
+use QBuilder\Condition\Field;
 
-$query1 = $qb->select('id', 'name', '"customer" AS type')
+$query1 = $qb->select('id', 'name', Field::set('1', '', 'source'))
     ->from('customers')
     ->where()
         ->eq('status', 'active')
         ->end();
 
 $query2 = $qb->subQuery()
-    ->select('id', 'name', '"supplier" AS type')
+    ->select('id', 'name', Field::set('2', '', 'source'))
     ->from('suppliers')
     ->where()
         ->eq('status', 'active')
@@ -147,13 +151,19 @@ $query2 = $qb->subQuery()
 $union = new UnionBuilder($qb);
 $union->add($query1);
 $union->add($query2);
+$union->orderBy(ConditionBy::orderBy()->asc('name'))->limit(20);
 
 $sql = $union->build();
 
-// (SELECT `id`, `name`, "customer" AS type FROM `customers` WHERE (`status` = 'active'))
+// SELECT `id`, `name`, 1 AS `source` FROM `customers` WHERE (`status` = 'active')
 // UNION
-// (SELECT `id`, `name`, "supplier" AS type FROM `suppliers` WHERE (`status` = 'active'))
+// SELECT `id`, `name`, 2 AS `source` FROM `suppliers` WHERE (`status` = 'active')
+// ORDER BY `name` ASC
+// LIMIT 20
 ```
+
+`ORDER BY` и `LIMIT` применяются ко всему результату UNION. MS SQL Server при одном лимите получает `ORDER BY (SELECT NULL)`: его `OFFSET ... FETCH` требует `ORDER BY`; ClickHouse применяет их только к последнему запросу, поэтому UNION оборачивается в `SELECT * FROM (...)`, а UNION без ALL выводится как `UNION DISTINCT`. Строковую константу выбрать напрямую нельзя — `select("'customer'")` отклоняется как невалидное имя поля — используйте числовой литерал или выражение.
+
 
 ---
 

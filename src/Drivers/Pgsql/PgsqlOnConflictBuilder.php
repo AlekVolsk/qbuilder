@@ -4,52 +4,27 @@ declare(strict_types=1);
 
 namespace QBuilder\Drivers\Pgsql;
 
-use QBuilder\Builder\AbstractOnConflictBuilder;
-use QBuilder\Drivers\DriverInterface;
+use QBuilder\Builder\AbstractOnConflictDoUpdateBuilder;
 use QBuilder\Exceptions\MissingRequirementException;
-use QBuilder\QueryBuilder;
 
 /**
- * ON CONFLICT ... DO UPDATE builder for PostgreSQL.
- *
- * PostgreSQL-specific syntax for handling conflicts on INSERT.
- * Analog of MySQL ON DUPLICATE KEY UPDATE.
+ * ON CONFLICT ... DO UPDATE builder for PostgreSQL: the conflict target is required,
+ * without updates the conflict is skipped with DO NOTHING.
  *
  * @example
- * // Simple usage (values are safely escaped)
- * $builder = PgsqlOnConflictBuilder::create($db, $driver)
- *     ->conflictTarget(['email'])  // Specify conflict fields
- *     ->set('name', $userName)  // Safe: automatically quoted
- *     ->sqlFunction('updated_at', 'NOW()');
+ * $qb->insert('users')
+ *     ->insertRow(['email' => $email, 'name' => $userName, 'view_count' => 1])
+ *     ->insertConflictHandler(
+ *         $qb->conflictBuilder()
+ *             ->conflictTarget(['email'])
+ *             ->excluded('name')          // "name" = EXCLUDED."name"
+ *             ->increment('view_count')   // "view_count" = "users"."view_count" + 1
+ *     );
  *
- * // Using EXCLUDED reference
- * $builder = PgsqlOnConflictBuilder::create($db, $driver)
- *     ->conflictTarget(['email'])
- *     ->excluded('email')  // Generates: email = EXCLUDED.email
- *     ->increment('view_count', 1);
- *
- * // Complex expressions
- * $builder = PgsqlOnConflictBuilder::create($db, $driver)
- *     ->conflictTarget(['id'])
- *     ->expression('price', 'price * 1.1')
- *     ->caseExpression('status', [
- *         'WHEN count > 10 THEN \'active\'',
- *         'ELSE \'pending\''
- *     ]);
+ * @internal
  */
-class PgsqlOnConflictBuilder extends AbstractOnConflictBuilder
+final class PgsqlOnConflictBuilder extends AbstractOnConflictDoUpdateBuilder
 {
-    /**
-     * Create new builder instance.
-     *
-     * @param QueryBuilder    $queryBuilder Parent QueryBuilder
-     * @param DriverInterface $driver       PostgreSQL driver
-     */
-    public static function create(QueryBuilder $queryBuilder, DriverInterface $driver): self
-    {
-        return new self($queryBuilder, $driver);
-    }
-
     #[\Override]
     public function build(): string
     {
@@ -58,27 +33,29 @@ class PgsqlOnConflictBuilder extends AbstractOnConflictBuilder
         }
 
         if ([] === $this->updates) {
-            return "\nON CONFLICT (".implode(', ', $this->conflictTargets).') DO NOTHING';
+            return "\nON CONFLICT (" . implode(', ', $this->conflictTargets) . ') DO NOTHING';
         }
 
         return parent::build();
     }
 
+    /**
+     * PostgreSQL resolves an unqualified column in DO UPDATE SET as ambiguous with EXCLUDED,
+     * so the current value is referenced through the INSERT table.
+     *
+     * @throws MissingRequirementException If the INSERT table is not set yet
+     */
     #[\Override]
-    protected function buildConflictClause(): string
+    protected function currentValueReference(string $quotedField): string
     {
-        if ([] === $this->conflictTargets) {
+        $table = $this->queryBuilder->getFromTable();
+
+        if ('' === $table) {
             throw new MissingRequirementException(
-                'PostgreSQL ON CONFLICT requires conflict target fields. Use ->conflictTarget([...]) to specify them.'
+                'PostgreSQL ON CONFLICT needs the INSERT table: call insert() before insertConflictHandler()'
             );
         }
 
-        return "\nON CONFLICT (".implode(', ', $this->conflictTargets).')';
-    }
-
-    #[\Override]
-    protected function buildUpdatePrefix(): string
-    {
-        return 'DO UPDATE SET';
+        return $this->getDriver()->quoteName($table) . '.' . $quotedField;
     }
 }

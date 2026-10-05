@@ -23,6 +23,8 @@ use QBuilder\Services\SqlSecurity;
  * ConditionBy::groupBy()
  *     ->add('user_id')
  *     ->add('status', 'orders')
+ *
+ * @api
  */
 class ConditionBy
 {

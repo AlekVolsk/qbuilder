@@ -9,8 +9,10 @@ namespace QBuilder\Services;
  *
  * Collapses whitespace outside of string literals, quoted identifiers and comments.
  * Literals, quoted identifiers and comments are copied byte for byte.
+ *
+ * @internal
  */
-class SqlCompactor
+final class SqlCompactor
 {
     private const array CLOSING_QUOTES = ["'" => "'", '"' => '"', '`' => '`', '[' => ']'];
 

@@ -4,17 +4,17 @@ declare(strict_types=1);
 
 namespace QBuilder\Tests;
 
-use PHPUnit\Framework\TestCase;
 use QBuilder\Condition\ConditionJoin;
 use QBuilder\Condition\Field;
 use QBuilder\QueryBuilder;
+use Testo\Assert;
+use Testo\Test;
 
 /**
  * @internal
- *
- * @coversNothing
  */
-final class QueryBuilderFieldComparisonTest extends TestCase
+#[Test]
+final class QueryBuilderFieldComparisonTest
 {
     public function testEqField(): void
     {
@@ -25,7 +25,7 @@ final class QueryBuilderFieldComparisonTest extends TestCase
             ->build(true)
         ;
 
-        self::assertSame('SELECT `u`.* FROM `users` AS `u` WHERE (`u`.`department_id` = `d`.`id`)', $sql);
+        Assert::same($sql, 'SELECT `u`.* FROM `users` AS `u` WHERE (`u`.`department_id` = `d`.`id`)');
     }
 
     public function testNeqField(): void
@@ -37,7 +37,7 @@ final class QueryBuilderFieldComparisonTest extends TestCase
             ->build(true)
         ;
 
-        self::assertSame('SELECT * FROM `users` WHERE (`created_by` != `id`)', $sql);
+        Assert::same($sql, 'SELECT * FROM `users` WHERE (`created_by` != `id`)');
     }
 
     public function testGtField(): void
@@ -49,7 +49,7 @@ final class QueryBuilderFieldComparisonTest extends TestCase
             ->build(true)
         ;
 
-        self::assertSame('SELECT * FROM `employees` WHERE (`salary` > `min_salary`)', $sql);
+        Assert::same($sql, 'SELECT * FROM `employees` WHERE (`salary` > `min_salary`)');
     }
 
     public function testGteField(): void
@@ -61,7 +61,7 @@ final class QueryBuilderFieldComparisonTest extends TestCase
             ->build(true)
         ;
 
-        self::assertSame('SELECT * FROM `employees` WHERE (`salary` >= `min_salary`)', $sql);
+        Assert::same($sql, 'SELECT * FROM `employees` WHERE (`salary` >= `min_salary`)');
     }
 
     public function testLtField(): void
@@ -73,7 +73,7 @@ final class QueryBuilderFieldComparisonTest extends TestCase
             ->build(true)
         ;
 
-        self::assertSame('SELECT * FROM `products` WHERE (`price` < `max_price`)', $sql);
+        Assert::same($sql, 'SELECT * FROM `products` WHERE (`price` < `max_price`)');
     }
 
     public function testLteField(): void
@@ -85,7 +85,7 @@ final class QueryBuilderFieldComparisonTest extends TestCase
             ->build(true)
         ;
 
-        self::assertSame('SELECT * FROM `orders` WHERE (`discount` <= `max_discount`)', $sql);
+        Assert::same($sql, 'SELECT * FROM `orders` WHERE (`discount` <= `max_discount`)');
     }
 
     public function testFieldComparisonInJoin(): void
@@ -102,10 +102,10 @@ final class QueryBuilderFieldComparisonTest extends TestCase
         ;
 
         $expected = 'SELECT `e`.* FROM `employees` AS `e` '
-            .'LEFT JOIN `departments` AS `d` '
-            .'ON (`e`.`department_id` = `d`.`id`) AND (`e`.`salary` >= `d`.`min_salary`)';
+            . 'LEFT JOIN `departments` AS `d` '
+            . 'ON (`e`.`department_id` = `d`.`id`) AND (`e`.`salary` >= `d`.`min_salary`)';
 
-        self::assertSame($expected, $sql);
+        Assert::same($sql, $expected);
     }
 
     public function testFieldComparisonInCorrelatedSubquery(): void
@@ -127,12 +127,12 @@ final class QueryBuilderFieldComparisonTest extends TestCase
         ;
 
         $expected = 'SELECT `u`.`id`, `u`.`name`, '
-            .'(SELECT COUNT(*) FROM `orders` AS `o` '
-            .'WHERE (`o`.`user_id` = `u`.`id`) AND (`o`.`total` > `u`.`credit_limit`)) '
-            .'AS `high_orders` '
-            .'FROM `users` AS `u`';
+            . '(SELECT COUNT(*) FROM `orders` AS `o` '
+            . 'WHERE (`o`.`user_id` = `u`.`id`) AND (`o`.`total` > `u`.`credit_limit`)) '
+            . 'AS `high_orders` '
+            . 'FROM `users` AS `u`';
 
-        self::assertSame($expected, $sql);
+        Assert::same($sql, $expected);
     }
 
     public function testJoinNeqField(): void
@@ -149,10 +149,10 @@ final class QueryBuilderFieldComparisonTest extends TestCase
         ;
 
         $expected = 'SELECT `o`.* FROM `orders` AS `o` '
-            .'LEFT JOIN `users` AS `u` '
-            .'ON (`o`.`user_id` = `u`.`id`) AND (`o`.`status` != `u`.`default_status`)';
+            . 'LEFT JOIN `users` AS `u` '
+            . 'ON (`o`.`user_id` = `u`.`id`) AND (`o`.`status` != `u`.`default_status`)';
 
-        self::assertSame($expected, $sql);
+        Assert::same($sql, $expected);
     }
 
     public function testJoinGtField(): void
@@ -169,10 +169,10 @@ final class QueryBuilderFieldComparisonTest extends TestCase
         ;
 
         $expected = 'SELECT `o`.* FROM `orders` AS `o` '
-            .'INNER JOIN `products` AS `p` '
-            .'ON (`o`.`product_id` = `p`.`id`) AND (`o`.`quantity` > `p`.`min_order_qty`)';
+            . 'INNER JOIN `products` AS `p` '
+            . 'ON (`o`.`product_id` = `p`.`id`) AND (`o`.`quantity` > `p`.`min_order_qty`)';
 
-        self::assertSame($expected, $sql);
+        Assert::same($sql, $expected);
     }
 
     public function testJoinLtField(): void
@@ -189,10 +189,10 @@ final class QueryBuilderFieldComparisonTest extends TestCase
         ;
 
         $expected = 'SELECT `o`.* FROM `orders` AS `o` '
-            .'INNER JOIN `products` AS `p` '
-            .'ON (`o`.`product_id` = `p`.`id`) AND (`o`.`price` < `p`.`max_price`)';
+            . 'INNER JOIN `products` AS `p` '
+            . 'ON (`o`.`product_id` = `p`.`id`) AND (`o`.`price` < `p`.`max_price`)';
 
-        self::assertSame($expected, $sql);
+        Assert::same($sql, $expected);
     }
 
     public function testJoinLteField(): void
@@ -209,10 +209,10 @@ final class QueryBuilderFieldComparisonTest extends TestCase
         ;
 
         $expected = 'SELECT `o`.* FROM `orders` AS `o` '
-            .'LEFT JOIN `users` AS `u` '
-            .'ON (`o`.`user_id` = `u`.`id`) AND (`o`.`discount` <= `u`.`max_discount`)';
+            . 'LEFT JOIN `users` AS `u` '
+            . 'ON (`o`.`user_id` = `u`.`id`) AND (`o`.`discount` <= `u`.`max_discount`)';
 
-        self::assertSame($expected, $sql);
+        Assert::same($sql, $expected);
     }
 
     public function testJoinMultipleFieldComparisons(): void
@@ -230,11 +230,11 @@ final class QueryBuilderFieldComparisonTest extends TestCase
         ;
 
         $expected = 'SELECT `o`.* FROM `orders` AS `o` '
-            .'LEFT JOIN `users` AS `u` '
-            .'ON (`o`.`user_id` = `u`.`id`) AND (`o`.`created_at` >= `u`.`last_login`) '
-            .'AND (`o`.`total` < `u`.`credit_limit`)';
+            . 'LEFT JOIN `users` AS `u` '
+            . 'ON (`o`.`user_id` = `u`.`id`) AND (`o`.`created_at` >= `u`.`last_login`) '
+            . 'AND (`o`.`total` < `u`.`credit_limit`)';
 
-        self::assertSame($expected, $sql);
+        Assert::same($sql, $expected);
     }
 
     public function testEqFieldWithFieldObjects(): void
@@ -249,7 +249,7 @@ final class QueryBuilderFieldComparisonTest extends TestCase
             ->build(true)
         ;
 
-        self::assertSame('SELECT `u`.* FROM `users` AS `u` WHERE (`u`.`department_id` = `d`.`id`)', $sql);
+        Assert::same($sql, 'SELECT `u`.* FROM `users` AS `u` WHERE (`u`.`department_id` = `d`.`id`)');
     }
 
     public function testNeqFieldWithFieldObjects(): void
@@ -264,7 +264,7 @@ final class QueryBuilderFieldComparisonTest extends TestCase
             ->build(true)
         ;
 
-        self::assertSame('SELECT * FROM `users` WHERE (`created_by` != `id`)', $sql);
+        Assert::same($sql, 'SELECT * FROM `users` WHERE (`created_by` != `id`)');
     }
 
     public function testGtFieldWithFieldObjects(): void
@@ -279,7 +279,7 @@ final class QueryBuilderFieldComparisonTest extends TestCase
             ->build(true)
         ;
 
-        self::assertSame('SELECT `e`.* FROM `employees` AS `e` WHERE (`e`.`salary` > `d`.`min_salary`)', $sql);
+        Assert::same($sql, 'SELECT `e`.* FROM `employees` AS `e` WHERE (`e`.`salary` > `d`.`min_salary`)');
     }
 
     public function testGteFieldWithFieldObjects(): void
@@ -294,7 +294,7 @@ final class QueryBuilderFieldComparisonTest extends TestCase
             ->build(true)
         ;
 
-        self::assertSame('SELECT `e`.* FROM `employees` AS `e` WHERE (`e`.`salary` >= `d`.`min_salary`)', $sql);
+        Assert::same($sql, 'SELECT `e`.* FROM `employees` AS `e` WHERE (`e`.`salary` >= `d`.`min_salary`)');
     }
 
     public function testLtFieldWithFieldObjects(): void
@@ -309,7 +309,7 @@ final class QueryBuilderFieldComparisonTest extends TestCase
             ->build(true)
         ;
 
-        self::assertSame('SELECT `p`.* FROM `products` AS `p` WHERE (`p`.`price` < `p`.`max_price`)', $sql);
+        Assert::same($sql, 'SELECT `p`.* FROM `products` AS `p` WHERE (`p`.`price` < `p`.`max_price`)');
     }
 
     public function testLteFieldWithFieldObjects(): void
@@ -324,7 +324,7 @@ final class QueryBuilderFieldComparisonTest extends TestCase
             ->build(true)
         ;
 
-        self::assertSame('SELECT `o`.* FROM `orders` AS `o` WHERE (`o`.`discount` <= `u`.`max_discount`)', $sql);
+        Assert::same($sql, 'SELECT `o`.* FROM `orders` AS `o` WHERE (`o`.`discount` <= `u`.`max_discount`)');
     }
 
     public function testFieldComparisonWithMixedFieldAndString(): void
@@ -338,7 +338,7 @@ final class QueryBuilderFieldComparisonTest extends TestCase
             ->build(true)
         ;
 
-        self::assertSame('SELECT * FROM `products` WHERE (`products`.`price` = `products`.`cost`)', $sql);
+        Assert::same($sql, 'SELECT * FROM `products` WHERE (`products`.`price` = `products`.`cost`)');
     }
 
     public function testFieldComparisonWithStringAndFieldObject(): void
@@ -352,6 +352,6 @@ final class QueryBuilderFieldComparisonTest extends TestCase
             ->build(true)
         ;
 
-        self::assertSame('SELECT * FROM `products` WHERE (`products`.`price` = `products`.`cost`)', $sql);
+        Assert::same($sql, 'SELECT * FROM `products` WHERE (`products`.`price` = `products`.`cost`)');
     }
 }

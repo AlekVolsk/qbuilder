@@ -6,6 +6,7 @@ namespace QBuilder\Drivers;
 
 use QBuilder\Condition\ConditionBuilder;
 use QBuilder\Condition\ConditionJoin;
+use QBuilder\Exceptions\MissingRequirementException;
 use QBuilder\QueryBuilder;
 use QBuilder\Services\SqlCompactor;
 use QBuilder\Services\SqlSecurity;
@@ -15,10 +16,11 @@ use QBuilder\Services\SqlSecurity;
  *
  * Provides base implementation for building SQL queries from QueryBuilder state.
  * Specific drivers can override methods to implement database-specific syntax.
+ *
+ * @internal
  */
 abstract class AbstractSqlBuilder implements SqlBuilderInterface
 {
-    protected string $builtQuery = '';
     protected SqlCompactor $compactor;
 
     public function __construct(
@@ -30,6 +32,8 @@ abstract class AbstractSqlBuilder implements SqlBuilderInterface
 
     public function build(bool $compact = false): string
     {
+        $this->assertStatementHasData();
+
         $sql = match ($this->queryBuilder->getType()) {
             'SELECT' => $this->buildSelect(),
             'INSERT' => $this->buildInsert(),
@@ -42,8 +46,6 @@ abstract class AbstractSqlBuilder implements SqlBuilderInterface
         if ($compact && '' !== $sql) {
             $sql = $this->compactor->compact($sql);
         }
-
-        $this->builtQuery = $sql;
 
         return $sql;
     }
@@ -71,48 +73,34 @@ abstract class AbstractSqlBuilder implements SqlBuilderInterface
     public function buildInsert(): string
     {
         $fromTable = $this->queryBuilder->getFromTable();
-        $sql = 'INSERT INTO '.$this->driver->quoteName($fromTable);
+        $sql = 'INSERT INTO ' . $this->driver->quoteName($fromTable);
 
         $insertData = $this->queryBuilder->getInsertData();
         $insertRows = $this->queryBuilder->getInsertRows();
         $insertFields = $this->queryBuilder->getInsertFields();
 
-        if (
-            [] !== $insertData
-            && isset($insertData['_subquery'])
-            && $insertData['_subquery'] instanceof QueryBuilder
-        ) {
-            return $this->buildInsertFromSubquery($sql, $insertData);
+        if (($insertData['_subquery'] ?? null) instanceof QueryBuilder) {
+            return $this->buildInsertFromSubquery($sql, $insertData['_subquery'], $insertData['_fields'] ?? []);
         }
 
-        if ([] !== $insertRows) {
-            return $this->buildInsertRows($sql, $insertRows, $insertFields);
-        }
-
-        return $sql;
+        return $this->buildInsertRows($sql, $insertRows, $insertFields);
     }
 
     public function buildUpdate(): string
     {
         $fromTable = $this->queryBuilder->getFromTable();
-        $sql = 'UPDATE '.$this->driver->quoteName($fromTable);
+        $sql = 'UPDATE ' . $this->driver->quoteName($fromTable);
 
-        $updateData = $this->queryBuilder->getUpdateData();
-
-        if ([] === $updateData) {
-            return $sql;
-        }
-
-        $sql .= "\nSET ".$this->buildUpdateSets($updateData);
+        $sql .= "\nSET " . $this->buildUpdateSets($this->queryBuilder->getUpdateData());
 
         $insertData = $this->queryBuilder->getInsertData();
 
-        if (
-            [] !== $insertData
-            && isset($insertData['_update_subquery'])
-            && $insertData['_update_subquery'] instanceof QueryBuilder
-        ) {
-            return $this->buildUpdateWithSubquery($sql, $insertData);
+        if (($insertData['_update_subquery'] ?? null) instanceof QueryBuilder) {
+            return $this->buildIdInSubquery(
+                $sql,
+                $insertData['_update_subquery'],
+                $insertData['_update_id_field'] ?? 'id'
+            );
         }
 
         $sql .= $this->buildWhereClause();
@@ -123,16 +111,16 @@ abstract class AbstractSqlBuilder implements SqlBuilderInterface
     public function buildDelete(): string
     {
         $fromTable = $this->queryBuilder->getFromTable();
-        $sql = 'DELETE FROM '.$this->driver->quoteName($fromTable);
+        $sql = 'DELETE FROM ' . $this->driver->quoteName($fromTable);
 
         $insertData = $this->queryBuilder->getInsertData();
 
-        if (
-            [] !== $insertData
-            && isset($insertData['_delete_subquery'])
-            && $insertData['_delete_subquery'] instanceof QueryBuilder
-        ) {
-            return $this->buildDeleteWithSubquery($sql, $insertData);
+        if (($insertData['_delete_subquery'] ?? null) instanceof QueryBuilder) {
+            return $this->buildIdInSubquery(
+                $sql,
+                $insertData['_delete_subquery'],
+                $insertData['_delete_id_field'] ?? 'id'
+            );
         }
 
         $sql .= $this->buildWhereClause();
@@ -142,21 +130,12 @@ abstract class AbstractSqlBuilder implements SqlBuilderInterface
 
     abstract public function buildProcedure(): string;
 
-    public function getBuiltQuery(): string
-    {
-        return $this->builtQuery;
-    }
-
     /**
      * Build SELECT fields clause.
      */
     protected function buildSelectFields(): string
     {
         $selectFields = $this->queryBuilder->getSelectFields();
-
-        if ([] === $selectFields) {
-            return '*';
-        }
 
         $fields = [];
 
@@ -189,10 +168,10 @@ abstract class AbstractSqlBuilder implements SqlBuilderInterface
         $fromAlias = $this->queryBuilder->getFromAlias();
 
         if ('' !== $fromAlias && '0' !== $fromAlias) {
-            $sql .= $this->getAliasKeyword().$this->driver->quoteName($fromAlias);
+            $sql .= $this->getAliasKeyword() . $this->driver->quoteName($fromAlias);
         }
 
-        return $sql.$this->driver->buildIndexHints($this->queryBuilder->getFromIndexHints());
+        return $sql . $this->driver->buildIndexHints($this->queryBuilder->getFromIndexHints());
     }
 
     /**
@@ -212,10 +191,10 @@ abstract class AbstractSqlBuilder implements SqlBuilderInterface
         $sql = '';
 
         foreach ($this->queryBuilder->getJoinClauses() as $position => $join) {
-            $sql .= "\n".$join['type'].' JOIN '.$this->driver->quoteName($join['table']);
+            $sql .= "\n" . $join['type'] . ' JOIN ' . $this->driver->quoteName($join['table']);
 
             if (! empty($join['alias']) && $join['alias'] !== $join['table']) {
-                $sql .= $this->getAliasKeyword().$this->driver->quoteName($join['alias']);
+                $sql .= $this->getAliasKeyword() . $this->driver->quoteName($join['alias']);
             }
 
             $sql .= $this->driver->buildIndexHints($this->queryBuilder->getJoinIndexHints($position));
@@ -223,20 +202,20 @@ abstract class AbstractSqlBuilder implements SqlBuilderInterface
             if ('CROSS' !== $join['type'] && $join['conditions']->hasConditions()) {
                 $tableOrAlias = ! empty($join['alias']) ? $join['alias'] : $join['table'];
                 $join['conditions']->setJoinAlias($tableOrAlias);
-                $sql .= ' ON'.$this->buildJoinConditions($join['conditions']);
+                $sql .= ' ON' . $this->buildJoinConditions($join['conditions']);
             }
         }
 
         foreach ($this->queryBuilder->getJoinFromSelectClauses() as $join) {
-            $sql .= "\n".$join['type'].' JOIN ('.$join['subQuery']->getQuery().')';
+            $sql .= "\n" . $join['type'] . ' JOIN (' . $join['subQuery']->getQuery() . ')';
 
             if (! empty($join['alias'])) {
-                $sql .= $this->getAliasKeyword().$this->driver->quoteName($join['alias']);
+                $sql .= $this->getAliasKeyword() . $this->driver->quoteName($join['alias']);
             }
 
             if ('CROSS' !== $join['type'] && $join['conditions']->hasConditions()) {
                 $join['conditions']->setJoinAlias($join['alias']);
-                $sql .= ' ON'.$this->buildJoinConditions($join['conditions']);
+                $sql .= ' ON' . $this->buildJoinConditions($join['conditions']);
             }
         }
 
@@ -251,7 +230,7 @@ abstract class AbstractSqlBuilder implements SqlBuilderInterface
         $whereBuilder = $this->queryBuilder->getWhereBuilder();
 
         if ($whereBuilder instanceof ConditionBuilder && $whereBuilder->hasConditions()) {
-            return "\nWHERE".$whereBuilder->build();
+            return "\nWHERE" . $whereBuilder->build();
         }
 
         return '';
@@ -272,13 +251,13 @@ abstract class AbstractSqlBuilder implements SqlBuilderInterface
 
         foreach ($groupBy as $groupField) {
             if (! empty($groupField['table'])) {
-                $groups[] = $this->driver->quoteName($groupField['table'].'.'.$groupField['field']);
+                $groups[] = $this->driver->quoteName($groupField['table'] . '.' . $groupField['field']);
             } else {
                 $groups[] = $this->driver->quoteName($groupField['field']);
             }
         }
 
-        return "\nGROUP BY ".implode(', ', $groups);
+        return "\nGROUP BY " . implode(', ', $groups);
     }
 
     /**
@@ -289,7 +268,7 @@ abstract class AbstractSqlBuilder implements SqlBuilderInterface
         $havingBuilder = $this->queryBuilder->getHavingBuilder();
 
         if ($havingBuilder instanceof ConditionBuilder && $havingBuilder->hasConditions()) {
-            return "\nHAVING".$havingBuilder->build();
+            return "\nHAVING" . $havingBuilder->build();
         }
 
         return '';
@@ -310,14 +289,14 @@ abstract class AbstractSqlBuilder implements SqlBuilderInterface
 
         foreach ($orderBy as $order) {
             if (! empty($order['table'])) {
-                $fieldStr = $this->driver->quoteName($order['table'].'.'.$order['field']);
+                $fieldStr = $this->driver->quoteName($order['table'] . '.' . $order['field']);
             } else {
                 $fieldStr = $this->driver->quoteName($order['field']);
             }
-            $orders[] = $fieldStr.' '.$order['direction'];
+            $orders[] = $fieldStr . ' ' . $order['direction'];
         }
 
-        return "\nORDER BY ".implode(', ', $orders);
+        return "\nORDER BY " . implode(', ', $orders);
     }
 
     /**
@@ -355,30 +334,30 @@ abstract class AbstractSqlBuilder implements SqlBuilderInterface
     protected function formatField(array $field): string
     {
         if (($field['subqueryObj'] ?? null) instanceof QueryBuilder) {
-            $subquerySql = '('.$field['subqueryObj']->build().')';
+            $subquerySql = '(' . $field['subqueryObj']->build() . ')';
 
             if (! empty($field['alias'])) {
-                $subquerySql .= ' AS '.$this->driver->quoteName($field['alias']);
+                $subquerySql .= ' AS ' . $this->driver->quoteName($field['alias']);
             }
 
             return $subquerySql;
         }
 
-        if ($field['isExpression']) {
+        if (true === $field['isExpression']) {
             $fieldStr = SqlSecurity::escapeIdentifiersInExpression(
                 $field['field'],
                 $this->driver->getIdentifierQuote()
             );
         } else {
             if (! empty($field['table'])) {
-                $fieldStr = $this->driver->quoteName($field['table'].'.'.$field['field']);
+                $fieldStr = $this->driver->quoteName($field['table'] . '.' . $field['field']);
             } else {
                 $fieldStr = $this->driver->quoteName($field['field']);
             }
         }
 
         if (! empty($field['alias'])) {
-            $fieldStr .= ' AS '.$this->driver->quoteName($field['alias']);
+            $fieldStr .= ' AS ' . $this->driver->quoteName($field['alias']);
         }
 
         return $fieldStr;
@@ -397,31 +376,24 @@ abstract class AbstractSqlBuilder implements SqlBuilderInterface
     }
 
     /**
-     * Build INSERT from subquery.
+     * Build INSERT ... SELECT.
      *
-     * @param string                                                $sql        Base INSERT SQL
-     * @param array<string, array<int, string>|QueryBuilder|string> $insertData Insert data array
-     *
-     * @return string Complete INSERT SQL
+     * @param string $sql    Base INSERT SQL
+     * @param mixed  $fields Target fields, empty for all
      */
-    protected function buildInsertFromSubquery(string $sql, array $insertData): string
+    protected function buildInsertFromSubquery(string $sql, QueryBuilder $subQuery, mixed $fields): string
     {
-        $subQuery = $insertData['_subquery'];
-        $fields = $insertData['_fields'] ?? [];
-
-        if (! empty($fields) && \is_array($fields)) {
+        if (\is_array($fields) && [] !== $fields) {
             $validatedFields = array_map(
-                fn (string $f): string => $this->driver->quoteName(SqlSecurity::validateFieldName($f)),
+                fn (mixed $f): string => $this->driver->quoteName(
+                    SqlSecurity::validateFieldName(\is_string($f) ? $f : '')
+                ),
                 $fields
             );
-            $sql .= ' ('.implode(', ', $validatedFields).')';
+            $sql .= ' (' . implode(', ', $validatedFields) . ')';
         }
 
-        if (! $subQuery instanceof QueryBuilder) {
-            throw new \InvalidArgumentException('Subquery must be an instance of QueryBuilder');
-        }
-
-        return $sql."\n".$subQuery->build();
+        return $sql . "\n" . $subQuery->build();
     }
 
     /**
@@ -439,7 +411,7 @@ abstract class AbstractSqlBuilder implements SqlBuilderInterface
             fn ($f): string => $this->driver->quoteName(SqlSecurity::validateFieldName($f)),
             $insertFields
         );
-        $sql .= ' ('.implode(', ', $validatedFields).')';
+        $sql .= ' (' . implode(', ', $validatedFields) . ')';
         $sql .= "\nVALUES ";
 
         $allRows = [];
@@ -451,7 +423,7 @@ abstract class AbstractSqlBuilder implements SqlBuilderInterface
                 $value = $row[$field] ?? null;
                 $valuePlaceholders[] = $this->driver->formatValue($value);
             }
-            $allRows[] = '('.implode(', ', $valuePlaceholders).')';
+            $allRows[] = '(' . implode(', ', $valuePlaceholders) . ')';
         }
 
         $sql .= implode(",\n", $allRows);
@@ -479,56 +451,23 @@ abstract class AbstractSqlBuilder implements SqlBuilderInterface
         foreach ($updateData as $field => $value) {
             $validatedField = SqlSecurity::validateFieldName($field);
             $quotedField = $this->driver->quoteName($validatedField);
-            $sets[] = $quotedField.' = '.$this->driver->formatValue($value);
+            $sets[] = $quotedField . ' = ' . $this->driver->formatValue($value);
         }
 
         return implode(', ', $sets);
     }
 
     /**
-     * Build UPDATE with subquery.
+     * Restrict UPDATE/DELETE to rows whose id is returned by the subquery.
      *
-     * @param string                                                $sql        Base UPDATE SQL
-     * @param array<string, array<int, string>|QueryBuilder|string> $insertData Insert data array
-     *
-     * @return string Complete UPDATE SQL
+     * @param string $sql     Base UPDATE/DELETE SQL
+     * @param mixed  $idField Id field name
      */
-    protected function buildUpdateWithSubquery(string $sql, array $insertData): string
+    protected function buildIdInSubquery(string $sql, QueryBuilder $subQuery, mixed $idField): string
     {
-        $subQuery = $insertData['_update_subquery'];
+        $idField = \is_string($idField) && '' !== $idField ? $idField : 'id';
 
-        if (! $subQuery instanceof QueryBuilder) {
-            throw new \InvalidArgumentException('Subquery must be an instance of QueryBuilder');
-        }
-
-        $idField = $insertData['_update_id_field'] ?? 'id';
-        $idField = \is_string($idField) ? $idField : 'id';
-
-        return $sql."\nWHERE ".$this->driver->quoteName($idField)
-            ." IN (\n".$subQuery->build()."\n)";
-    }
-
-    /**
-     * Build DELETE with subquery.
-     *
-     * @param string                                                $sql        Base DELETE SQL
-     * @param array<string, array<int, string>|QueryBuilder|string> $insertData Insert data array
-     *
-     * @return string Complete DELETE SQL
-     */
-    protected function buildDeleteWithSubquery(string $sql, array $insertData): string
-    {
-        $subQuery = $insertData['_delete_subquery'];
-
-        if (! $subQuery instanceof QueryBuilder) {
-            throw new \InvalidArgumentException('Subquery must be an instance of QueryBuilder');
-        }
-
-        $idField = $insertData['_delete_id_field'] ?? 'id';
-        $idField = \is_string($idField) ? $idField : 'id';
-
-        return $sql."\nWHERE ".$this->driver->quoteName($idField)
-            ." IN (\n".$subQuery->build()."\n)";
+        return $sql . "\nWHERE " . $this->driver->quoteName($idField) . " IN (\n" . $subQuery->build() . "\n)";
     }
 
     /**
@@ -540,6 +479,26 @@ abstract class AbstractSqlBuilder implements SqlBuilderInterface
      */
     protected function buildInsertConflictSuffix(string $conflictData): string
     {
-        return "\n".$conflictData;
+        return "\n" . $conflictData;
+    }
+
+    /**
+     * @throws MissingRequirementException If INSERT has no row fields or UPDATE has no assignments
+     */
+    private function assertStatementHasData(): void
+    {
+        $type = $this->queryBuilder->getType();
+
+        if (
+            'INSERT' === $type
+            && ! ($this->queryBuilder->getInsertData()['_subquery'] ?? null) instanceof QueryBuilder
+            && [] === $this->queryBuilder->getInsertFields()
+        ) {
+            throw new MissingRequirementException('INSERT needs at least one field: use insertRow() or insertFrom()');
+        }
+
+        if ('UPDATE' === $type && [] === $this->queryBuilder->getUpdateData()) {
+            throw new MissingRequirementException('UPDATE needs at least one field: use updateRow()');
+        }
     }
 }

@@ -4,28 +4,28 @@ declare(strict_types=1);
 
 namespace QBuilder\Tests;
 
-use PHPUnit\Framework\Attributes\DataProvider;
-use PHPUnit\Framework\TestCase;
 use QBuilder\Condition\ConditionBy;
 use QBuilder\Condition\ConditionJoin;
 use QBuilder\Condition\Field;
 use QBuilder\Drivers\Mysql\MysqlDriver;
 use QBuilder\QbConsts;
 use QBuilder\QueryBuilder;
+use Testo\Assert;
+use Testo\Data\DataProvider;
+use Testo\Test;
 
 /**
  * @internal
- *
- * @coversNothing
  */
-final class MysqlDriverTest extends TestCase
+#[Test]
+final class MysqlDriverTest
 {
     public function testMysqlQuoting(): void
     {
         $qb = $this->getQueryBuilder();
         $sql = $qb->select('id', 'name')->from('users')->build(true);
 
-        self::assertSame('SELECT `id`, `name` FROM `users`', $sql);
+        Assert::same($sql, 'SELECT `id`, `name` FROM `users`');
     }
 
     public function testMysqlOnDuplicateKeyUpdate(): void
@@ -42,10 +42,10 @@ final class MysqlDriverTest extends TestCase
         ;
 
         $expected = 'INSERT INTO `users` (`email`, `name`) '
-            .'VALUES (\'test@example.com\', \'John\') '
-            .'ON DUPLICATE KEY UPDATE `name` = \'John Updated\', `updated_at` = NOW()';
+            . 'VALUES (\'test@example.com\', \'John\') '
+            . 'ON DUPLICATE KEY UPDATE `name` = \'John Updated\', `updated_at` = NOW()';
 
-        self::assertSame($expected, $sql);
+        Assert::same($sql, $expected);
     }
 
     public function testMysqlOnDuplicateKeyUpdateValues(): void
@@ -61,9 +61,9 @@ final class MysqlDriverTest extends TestCase
         ;
 
         $expected = 'INSERT INTO `users` (`id`, `counter`) VALUES (1, 1) '
-            .'ON DUPLICATE KEY UPDATE `counter` = VALUES(counter)';
+            . 'ON DUPLICATE KEY UPDATE `counter` = VALUES(counter)';
 
-        self::assertSame($expected, $sql);
+        Assert::same($sql, $expected);
     }
 
     public function testMysqlOnDuplicateKeyUpdateIncrement(): void
@@ -79,9 +79,9 @@ final class MysqlDriverTest extends TestCase
         ;
 
         $expected = 'INSERT INTO `users` (`id`, `views`) VALUES (1, 1) '
-            .'ON DUPLICATE KEY UPDATE `views` = `views` + 1';
+            . 'ON DUPLICATE KEY UPDATE `views` = `views` + 1';
 
-        self::assertSame($expected, $sql);
+        Assert::same($sql, $expected);
     }
 
     public function testMysqlOnDuplicateKeyUpdateDecrement(): void
@@ -97,9 +97,9 @@ final class MysqlDriverTest extends TestCase
         ;
 
         $expected = 'INSERT INTO `users` (`id`, `stock`) VALUES (1, 10) '
-            .'ON DUPLICATE KEY UPDATE `stock` = `stock` - 1';
+            . 'ON DUPLICATE KEY UPDATE `stock` = `stock` - 1';
 
-        self::assertSame($expected, $sql);
+        Assert::same($sql, $expected);
     }
 
     public function testMysqlLimit(): void
@@ -107,7 +107,7 @@ final class MysqlDriverTest extends TestCase
         $qb = $this->getQueryBuilder();
         $sql = $qb->select('*')->from('users')->limit(10)->build(true);
 
-        self::assertSame('SELECT * FROM `users` LIMIT 10', $sql);
+        Assert::same($sql, 'SELECT * FROM `users` LIMIT 10');
     }
 
     public function testMysqlLimitOffset(): void
@@ -115,7 +115,7 @@ final class MysqlDriverTest extends TestCase
         $qb = $this->getQueryBuilder();
         $sql = $qb->select('*')->from('users')->limit(10, 20)->build(true);
 
-        self::assertSame('SELECT * FROM `users` LIMIT 20, 10', $sql);
+        Assert::same($sql, 'SELECT * FROM `users` LIMIT 20, 10');
     }
 
     public function testMysqlProcedureNoParams(): void
@@ -123,7 +123,7 @@ final class MysqlDriverTest extends TestCase
         $qb = $this->getQueryBuilder();
         $sql = $qb->procedure('get_all_users')->build(true);
 
-        self::assertSame('CALL `get_all_users`()', $sql);
+        Assert::same($sql, 'CALL `get_all_users`()');
     }
 
     public function testMysqlProcedureWithParams(): void
@@ -131,7 +131,7 @@ final class MysqlDriverTest extends TestCase
         $qb = $this->getQueryBuilder();
         $sql = $qb->procedure('get_user_by_id', [1, 'active'])->build(true);
 
-        self::assertSame('CALL `get_user_by_id`(1, \'active\')', $sql);
+        Assert::same($sql, 'CALL `get_user_by_id`(1, \'active\')');
     }
 
     public function testMysqlUpdateWithLimit(): void
@@ -143,7 +143,7 @@ final class MysqlDriverTest extends TestCase
             ->build(true)
         ;
 
-        self::assertSame('UPDATE `users` SET `status` = \'inactive\' WHERE (`active` = 0) LIMIT 10', $sql);
+        Assert::same($sql, 'UPDATE `users` SET `status` = \'inactive\' WHERE (`active` = 0) LIMIT 10');
     }
 
     public function testMysqlDeleteWithLimit(): void
@@ -155,7 +155,7 @@ final class MysqlDriverTest extends TestCase
             ->build(true)
         ;
 
-        self::assertSame('DELETE FROM `users` WHERE (`status` = \'banned\') LIMIT 5', $sql);
+        Assert::same($sql, 'DELETE FROM `users` WHERE (`status` = \'banned\') LIMIT 5');
     }
 
     public function testMysqlInsertMultipleRows(): void
@@ -169,9 +169,9 @@ final class MysqlDriverTest extends TestCase
         ;
 
         $expected = 'INSERT INTO `users` (`name`, `age`) '
-            .'VALUES (\'John\', 30), (\'Jane\', 25), (\'Bob\', 35)';
+            . 'VALUES (\'John\', 30), (\'Jane\', 25), (\'Bob\', 35)';
 
-        self::assertSame($expected, $sql);
+        Assert::same($sql, $expected);
     }
 
     public function testMysqlEscapeLikePattern(): void
@@ -183,7 +183,7 @@ final class MysqlDriverTest extends TestCase
             ->build(true)
         ;
 
-        self::assertSame("SELECT * FROM `users` WHERE (`name` LIKE '50!%%' ESCAPE '!')", $sql);
+        Assert::same($sql, "SELECT * FROM `users` WHERE (`name` LIKE '50!%%' ESCAPE '!')");
     }
 
     /**
@@ -192,7 +192,7 @@ final class MysqlDriverTest extends TestCase
     #[DataProvider('provideMysqlEscapeValueCases')]
     public function testMysqlEscapeValue(string $value, string $expected): void
     {
-        self::assertSame($expected, (new MysqlDriver())->quoteValue($value));
+        Assert::same((new MysqlDriver())->quoteValue($value), $expected);
     }
 
     /**
@@ -218,7 +218,7 @@ final class MysqlDriverTest extends TestCase
             ->build(true)
         ;
 
-        self::assertSame("SELECT `name` FROM `t` WHERE (`name` = 'a\\\\'') OR 1=1 -- ')", $sql);
+        Assert::same($sql, "SELECT `name` FROM `t` WHERE (`name` = 'a\\\\'') OR 1=1 -- ')");
     }
 
     public function testMysqlComplexJoin(): void
@@ -249,14 +249,14 @@ final class MysqlDriverTest extends TestCase
         ;
 
         $expected = 'SELECT `u`.`id`, `u`.`name`, `o`.`total`, `p`.`title` '
-            .'FROM `users` AS `u` '
-            .'LEFT JOIN `orders` AS `o` ON (`o`.`user_id` = `u`.`id`) '
-            .'LEFT JOIN `products` AS `p` ON (`p`.`id` = `o`.`product_id`) '
-            .'WHERE (`o`.`total` >= 100) '
-            .'ORDER BY `o`.`total` DESC '
-            .'LIMIT 20';
+            . 'FROM `users` AS `u` '
+            . 'LEFT JOIN `orders` AS `o` ON (`o`.`user_id` = `u`.`id`) '
+            . 'LEFT JOIN `products` AS `p` ON (`p`.`id` = `o`.`product_id`) '
+            . 'WHERE (`o`.`total` >= 100) '
+            . 'ORDER BY `o`.`total` DESC '
+            . 'LIMIT 20';
 
-        self::assertSame($expected, $sql);
+        Assert::same($sql, $expected);
     }
 
     public function testMysqlSubqueryInSelect(): void
@@ -275,11 +275,11 @@ final class MysqlDriverTest extends TestCase
         ;
 
         $expected = 'SELECT `id`, `name`, '
-            .'(SELECT COUNT(*) FROM `orders` WHERE (`orders`.`user_id` = `users`.`id`)) '
-            .'AS `order_count` '
-            .'FROM `users`';
+            . '(SELECT COUNT(*) FROM `orders` WHERE (`orders`.`user_id` = `users`.`id`)) '
+            . 'AS `order_count` '
+            . 'FROM `users`';
 
-        self::assertSame($expected, $sql);
+        Assert::same($sql, $expected);
     }
 
     public function testMysqlDistinct(): void
@@ -287,7 +287,7 @@ final class MysqlDriverTest extends TestCase
         $qb = $this->getQueryBuilder();
         $sql = $qb->select('user_id')->distinct()->from('orders')->build(true);
 
-        self::assertSame('SELECT DISTINCT `user_id` FROM `orders`', $sql);
+        Assert::same($sql, 'SELECT DISTINCT `user_id` FROM `orders`');
     }
 
     public function testMysqlDistinctMultipleFields(): void
@@ -295,7 +295,7 @@ final class MysqlDriverTest extends TestCase
         $qb = $this->getQueryBuilder();
         $sql = $qb->select('user_id', 'status')->distinct()->from('orders')->build(true);
 
-        self::assertSame('SELECT DISTINCT `user_id`, `status` FROM `orders`', $sql);
+        Assert::same($sql, 'SELECT DISTINCT `user_id`, `status` FROM `orders`');
     }
 
     public function testMysqlDistinctWithWhere(): void
@@ -306,7 +306,7 @@ final class MysqlDriverTest extends TestCase
             ->build(true)
         ;
 
-        self::assertSame('SELECT DISTINCT `user_id` FROM `orders` WHERE (`status` = \'completed\')', $sql);
+        Assert::same($sql, 'SELECT DISTINCT `user_id` FROM `orders` WHERE (`status` = \'completed\')');
     }
 
     public function testMysqlDistinctWithOrderBy(): void
@@ -318,7 +318,7 @@ final class MysqlDriverTest extends TestCase
             ->build(true)
         ;
 
-        self::assertSame('SELECT DISTINCT `category` FROM `products` ORDER BY `category` ASC', $sql);
+        Assert::same($sql, 'SELECT DISTINCT `category` FROM `products` ORDER BY `category` ASC');
     }
 
     public function testMysqlIgnoresFinalModifier(): void
@@ -326,7 +326,7 @@ final class MysqlDriverTest extends TestCase
         $qb = $this->getQueryBuilder();
         $sql = $qb->select()->from('users')->final()->build(true);
 
-        self::assertSame('SELECT * FROM `users`', $sql);
+        Assert::same($sql, 'SELECT * FROM `users`');
     }
 
     private function getQueryBuilder(): QueryBuilder

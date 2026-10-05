@@ -13,8 +13,10 @@ use QBuilder\QueryBuilder;
  * Oracle driver for QueryBuilder.
  *
  * Implements specific SQL query building logic for Oracle Database.
+ *
+ * @internal
  */
-class OracleDriver extends AbstractDriver
+final class OracleDriver extends AbstractDriver
 {
     public function getSqlBuilder(QueryBuilder $queryBuilder): SqlBuilderInterface
     {
@@ -46,15 +48,10 @@ class OracleDriver extends AbstractDriver
         $rowsClause = $withTies ? ' ROWS WITH TIES' : ' ROWS ONLY';
 
         if (null !== $offset && $offset > 0) {
-            return "\nOFFSET ".$offset." ROWS\nFETCH NEXT ".$limit.$rowsClause;
+            return "\nOFFSET " . $offset . " ROWS\nFETCH NEXT " . $limit . $rowsClause;
         }
 
-        return "\nFETCH FIRST ".$limit.$rowsClause;
-    }
-
-    public function getName(): string
-    {
-        return 'oracle';
+        return "\nFETCH FIRST " . $limit . $rowsClause;
     }
 
     /**

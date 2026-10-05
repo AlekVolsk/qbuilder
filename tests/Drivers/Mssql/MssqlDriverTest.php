@@ -4,26 +4,26 @@ declare(strict_types=1);
 
 namespace QBuilder\Tests;
 
-use PHPUnit\Framework\TestCase;
 use QBuilder\Condition\ConditionBy;
 use QBuilder\Condition\ConditionJoin;
 use QBuilder\Condition\Field;
 use QBuilder\QbConsts;
 use QBuilder\QueryBuilder;
+use Testo\Assert;
+use Testo\Test;
 
 /**
  * @internal
- *
- * @coversNothing
  */
-final class MssqlDriverTest extends TestCase
+#[Test]
+final class MssqlDriverTest
 {
     public function testMssqlQuoting(): void
     {
         $qb = $this->getQueryBuilder();
         $sql = $qb->select('id', 'name')->from('users')->build(true);
 
-        self::assertSame('SELECT [id], [name] FROM [users]', $sql);
+        Assert::same($sql, 'SELECT [id], [name] FROM [users]');
     }
 
     public function testMssqlTopLimit(): void
@@ -31,7 +31,7 @@ final class MssqlDriverTest extends TestCase
         $qb = $this->getQueryBuilder();
         $sql = $qb->select('*')->from('users')->limit(10)->build(true);
 
-        self::assertSame('SELECT TOP 10 * FROM [users]', $sql);
+        Assert::same($sql, 'SELECT TOP 10 * FROM [users]');
     }
 
     public function testMssqlTopWithTies(): void
@@ -44,11 +44,8 @@ final class MssqlDriverTest extends TestCase
             ->build(true)
         ;
 
-        self::assertSame(
-            'SELECT TOP 5 WITH TIES [name], [salary] FROM [employees] '
-            .'ORDER BY [salary] DESC',
-            $sql
-        );
+        Assert::same($sql, 'SELECT TOP 5 WITH TIES [name], [salary] FROM [employees] '
+        . 'ORDER BY [salary] DESC');
     }
 
     public function testMssqlOffsetFetch(): void
@@ -61,10 +58,7 @@ final class MssqlDriverTest extends TestCase
             ->build(true)
         ;
 
-        self::assertSame(
-            'SELECT * FROM [users] ORDER BY [id] ASC OFFSET 20 ROWS FETCH NEXT 10 ROWS ONLY',
-            $sql
-        );
+        Assert::same($sql, 'SELECT * FROM [users] ORDER BY [id] ASC OFFSET 20 ROWS FETCH NEXT 10 ROWS ONLY');
     }
 
     public function testMssqlProcedureNoParams(): void
@@ -72,7 +66,7 @@ final class MssqlDriverTest extends TestCase
         $qb = $this->getQueryBuilder();
         $sql = $qb->procedure('get_all_users')->build(true);
 
-        self::assertSame('EXEC [get_all_users]', $sql);
+        Assert::same($sql, 'EXEC [get_all_users]');
     }
 
     public function testMssqlProcedureWithParams(): void
@@ -80,7 +74,7 @@ final class MssqlDriverTest extends TestCase
         $qb = $this->getQueryBuilder();
         $sql = $qb->procedure('get_user_by_id', [1, 'active'])->build(true);
 
-        self::assertSame("EXEC [get_user_by_id] 1, 'active'", $sql);
+        Assert::same($sql, "EXEC [get_user_by_id] 1, 'active'");
     }
 
     public function testMssqlMergeUpsert(): void
@@ -98,12 +92,12 @@ final class MssqlDriverTest extends TestCase
         ;
 
         $expected = 'MERGE INTO [users] AS target '
-            .'USING (VALUES (1, \'John\', 30)) AS source ([id], [name], [age]) '
-            .'ON target.[id] = source.[id] '
-            .'WHEN MATCHED THEN UPDATE SET [name] = \'John Updated\', [age] = 31 '
-            .'WHEN NOT MATCHED THEN INSERT ([id], [name], [age]) VALUES (source.[id], source.[name], source.[age]);';
+            . 'USING (VALUES (1, \'John\', 30)) AS source ([id], [name], [age]) '
+            . 'ON target.[id] = source.[id] '
+            . 'WHEN MATCHED THEN UPDATE SET [name] = \'John Updated\', [age] = 31 '
+            . 'WHEN NOT MATCHED THEN INSERT ([id], [name], [age]) VALUES (source.[id], source.[name], source.[age]);';
 
-        self::assertSame($expected, $sql);
+        Assert::same($sql, $expected);
     }
 
     public function testMssqlInsertSimple(): void
@@ -111,7 +105,7 @@ final class MssqlDriverTest extends TestCase
         $qb = $this->getQueryBuilder();
         $sql = $qb->insert('users')->insertRow(['name' => 'John', 'age' => 30])->build(true);
 
-        self::assertSame("INSERT INTO [users] ([name], [age]) VALUES ('John', 30)", $sql);
+        Assert::same($sql, "INSERT INTO [users] ([name], [age]) VALUES ('John', 30)");
     }
 
     public function testMssqlInsertMultipleRows(): void
@@ -125,7 +119,7 @@ final class MssqlDriverTest extends TestCase
 
         $expected = "INSERT INTO [users] ([name], [age]) VALUES ('John', 30), ('Jane', 25)";
 
-        self::assertSame($expected, $sql);
+        Assert::same($sql, $expected);
     }
 
     public function testMssqlUpdateSimple(): void
@@ -136,7 +130,7 @@ final class MssqlDriverTest extends TestCase
             ->build(true)
         ;
 
-        self::assertSame('UPDATE [users] SET [status] = \'inactive\' WHERE ([id] = 1)', $sql);
+        Assert::same($sql, 'UPDATE [users] SET [status] = \'inactive\' WHERE ([id] = 1)');
     }
 
     public function testMssqlDeleteSimple(): void
@@ -144,7 +138,7 @@ final class MssqlDriverTest extends TestCase
         $qb = $this->getQueryBuilder();
         $sql = $qb->delete('users')->where()->eq('id', 1)->end()->build(true);
 
-        self::assertSame('DELETE FROM [users] WHERE ([id] = 1)', $sql);
+        Assert::same($sql, 'DELETE FROM [users] WHERE ([id] = 1)');
     }
 
     public function testMssqlEscapeLikePattern(): void
@@ -156,7 +150,7 @@ final class MssqlDriverTest extends TestCase
             ->build(true)
         ;
 
-        self::assertSame("SELECT * FROM [users] WHERE ([name] LIKE '50[%]%')", $sql);
+        Assert::same($sql, "SELECT * FROM [users] WHERE ([name] LIKE '50[%]%')");
     }
 
     public function testMssqlComplexJoin(): void
@@ -182,12 +176,12 @@ final class MssqlDriverTest extends TestCase
         ;
 
         $expected = 'SELECT TOP 20 [u].[id], [u].[name], [o].[total] '
-            .'FROM [users] AS [u] '
-            .'LEFT JOIN [orders] AS [o] ON ([o].[user_id] = [u].[id]) '
-            .'WHERE ([o].[total] >= 100) '
-            .'ORDER BY [o].[total] DESC';
+            . 'FROM [users] AS [u] '
+            . 'LEFT JOIN [orders] AS [o] ON ([o].[user_id] = [u].[id]) '
+            . 'WHERE ([o].[total] >= 100) '
+            . 'ORDER BY [o].[total] DESC';
 
-        self::assertSame($expected, $sql);
+        Assert::same($sql, $expected);
     }
 
     public function testMssqlSubqueryInSelect(): void
@@ -206,11 +200,11 @@ final class MssqlDriverTest extends TestCase
         ;
 
         $expected = 'SELECT [id], [name], '
-            .'(SELECT COUNT(*) FROM [orders] WHERE ([orders].[user_id] = [users].[id])) '
-            .'AS [order_count] '
-            .'FROM [users]';
+            . '(SELECT COUNT(*) FROM [orders] WHERE ([orders].[user_id] = [users].[id])) '
+            . 'AS [order_count] '
+            . 'FROM [users]';
 
-        self::assertSame($expected, $sql);
+        Assert::same($sql, $expected);
     }
 
     public function testMssqlWhereExists(): void
@@ -233,10 +227,10 @@ final class MssqlDriverTest extends TestCase
         ;
 
         $expected = 'SELECT * FROM [users] WHERE (EXISTS '
-            .'(SELECT 1 FROM [orders] WHERE ([orders].[user_id] = [users].[id]) '
-            .'AND ([total] >= 1000)))';
+            . '(SELECT 1 FROM [orders] WHERE ([orders].[user_id] = [users].[id]) '
+            . 'AND ([total] >= 1000)))';
 
-        self::assertSame($expected, $sql);
+        Assert::same($sql, $expected);
     }
 
     public function testMssqlGroupByHaving(): void
@@ -250,9 +244,9 @@ final class MssqlDriverTest extends TestCase
         ;
 
         $expected = 'SELECT [status], COUNT(*) AS [total] FROM [users] '
-            .'GROUP BY [status] HAVING (COUNT(*) > 5)';
+            . 'GROUP BY [status] HAVING (COUNT(*) > 5)';
 
-        self::assertSame($expected, $sql);
+        Assert::same($sql, $expected);
     }
 
     public function testMssqlDistinct(): void
@@ -260,7 +254,7 @@ final class MssqlDriverTest extends TestCase
         $qb = $this->getQueryBuilder();
         $sql = $qb->select('user_id')->distinct()->from('orders')->build(true);
 
-        self::assertSame('SELECT DISTINCT [user_id] FROM [orders]', $sql);
+        Assert::same($sql, 'SELECT DISTINCT [user_id] FROM [orders]');
     }
 
     public function testMssqlDistinctMultipleFields(): void
@@ -268,7 +262,7 @@ final class MssqlDriverTest extends TestCase
         $qb = $this->getQueryBuilder();
         $sql = $qb->select('user_id', 'status')->distinct()->from('orders')->build(true);
 
-        self::assertSame('SELECT DISTINCT [user_id], [status] FROM [orders]', $sql);
+        Assert::same($sql, 'SELECT DISTINCT [user_id], [status] FROM [orders]');
     }
 
     public function testMssqlDistinctWithTop(): void
@@ -276,7 +270,7 @@ final class MssqlDriverTest extends TestCase
         $qb = $this->getQueryBuilder();
         $sql = $qb->select('user_id')->distinct()->from('orders')->limit(10)->build(true);
 
-        self::assertSame('SELECT DISTINCT TOP 10 [user_id] FROM [orders]', $sql);
+        Assert::same($sql, 'SELECT DISTINCT TOP 10 [user_id] FROM [orders]');
     }
 
     public function testMssqlDistinctWithWhere(): void
@@ -287,7 +281,7 @@ final class MssqlDriverTest extends TestCase
             ->build(true)
         ;
 
-        self::assertSame('SELECT DISTINCT [user_id] FROM [orders] WHERE ([status] = \'completed\')', $sql);
+        Assert::same($sql, 'SELECT DISTINCT [user_id] FROM [orders] WHERE ([status] = \'completed\')');
     }
 
     public function testMssqlDistinctWithOrderBy(): void
@@ -299,7 +293,7 @@ final class MssqlDriverTest extends TestCase
             ->build(true)
         ;
 
-        self::assertSame('SELECT DISTINCT [category] FROM [products] ORDER BY [category] ASC', $sql);
+        Assert::same($sql, 'SELECT DISTINCT [category] FROM [products] ORDER BY [category] ASC');
     }
 
     private function getQueryBuilder(): QueryBuilder

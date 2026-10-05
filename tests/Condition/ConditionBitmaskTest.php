@@ -4,20 +4,21 @@ declare(strict_types=1);
 
 namespace QBuilder\Tests;
 
-use PHPUnit\Framework\Attributes\DataProvider;
-use PHPUnit\Framework\TestCase;
 use QBuilder\Condition\ConditionBy;
 use QBuilder\Condition\Field;
 use QBuilder\Exceptions\UnsupportedFeatureException;
 use QBuilder\QbConsts;
 use QBuilder\QueryBuilder;
+use Testo\Assert;
+use Testo\Data\DataProvider;
+use Testo\Expect;
+use Testo\Test;
 
 /**
  * @internal
- *
- * @coversNothing
  */
-final class ConditionBitmaskTest extends TestCase
+#[Test]
+final class ConditionBitmaskTest
 {
     public function testBitmaskSingleBitSet(): void
     {
@@ -30,10 +31,7 @@ final class ConditionBitmaskTest extends TestCase
             ->build(true)
         ;
 
-        self::assertSame(
-            'SELECT * FROM `users` WHERE ((`permissions` & 1 = 1))',
-            $sql
-        );
+        Assert::same($sql, 'SELECT * FROM `users` WHERE ((`permissions` & 1 = 1))');
     }
 
     public function testBitmaskSingleBitUnset(): void
@@ -47,10 +45,7 @@ final class ConditionBitmaskTest extends TestCase
             ->build(true)
         ;
 
-        self::assertSame(
-            'SELECT * FROM `users` WHERE ((`permissions` & 2 = 0))',
-            $sql
-        );
+        Assert::same($sql, 'SELECT * FROM `users` WHERE ((`permissions` & 2 = 0))');
     }
 
     public function testBitmaskMultipleBits(): void
@@ -64,11 +59,8 @@ final class ConditionBitmaskTest extends TestCase
             ->build(true)
         ;
 
-        self::assertSame(
-            'SELECT * FROM `users` WHERE ((`permissions` & 1 = 1) AND '
-            .'(`permissions` & 2 = 0) AND (`permissions` & 4 = 4))',
-            $sql
-        );
+        Assert::same($sql, 'SELECT * FROM `users` WHERE ((`permissions` & 1 = 1) AND '
+        . '(`permissions` & 2 = 0) AND (`permissions` & 4 = 4))');
     }
 
     public function testBitmaskWithBooleanStates(): void
@@ -82,9 +74,9 @@ final class ConditionBitmaskTest extends TestCase
             ->build(true)
         ;
 
-        self::assertSame(
-            'SELECT * FROM `users` WHERE ((`flags` & 1 = 1) AND (`flags` & 2 = 0) AND (`flags` & 4 = 4))',
-            $sql
+        Assert::same(
+            $sql,
+            'SELECT * FROM `users` WHERE ((`flags` & 1 = 1) AND (`flags` & 2 = 0) AND (`flags` & 4 = 4))'
         );
     }
 
@@ -99,10 +91,7 @@ final class ConditionBitmaskTest extends TestCase
             ->build(true)
         ;
 
-        self::assertSame(
-            'SELECT * FROM `users` WHERE (NOT ((`permissions` & 1 = 1)))',
-            $sql
-        );
+        Assert::same($sql, 'SELECT * FROM `users` WHERE (NOT ((`permissions` & 1 = 1)))');
     }
 
     public function testNotBitmaskMultipleBits(): void
@@ -116,10 +105,7 @@ final class ConditionBitmaskTest extends TestCase
             ->build(true)
         ;
 
-        self::assertSame(
-            'SELECT * FROM `users` WHERE (NOT ((`permissions` & 1 = 1) AND (`permissions` & 4 = 4)))',
-            $sql
-        );
+        Assert::same($sql, 'SELECT * FROM `users` WHERE (NOT ((`permissions` & 1 = 1) AND (`permissions` & 4 = 4)))');
     }
 
     public function testBitmaskWithTableAlias(): void
@@ -133,9 +119,9 @@ final class ConditionBitmaskTest extends TestCase
             ->build(true)
         ;
 
-        self::assertSame(
-            'SELECT `u`.* FROM `users` AS `u` WHERE ((`u`.`permissions` & 1 = 1) AND (`u`.`permissions` & 2 = 2))',
-            $sql
+        Assert::same(
+            $sql,
+            'SELECT `u`.* FROM `users` AS `u` WHERE ((`u`.`permissions` & 1 = 1) AND (`u`.`permissions` & 2 = 2))'
         );
     }
 
@@ -151,10 +137,7 @@ final class ConditionBitmaskTest extends TestCase
             ->build(true)
         ;
 
-        self::assertSame(
-            "SELECT * FROM `users` WHERE (`status` = 'active') AND ((`permissions` & 1 = 1))",
-            $sql
-        );
+        Assert::same($sql, "SELECT * FROM `users` WHERE (`status` = 'active') AND ((`permissions` & 1 = 1))");
     }
 
     public function testBitmaskAllDrivers(): void
@@ -180,7 +163,7 @@ final class ConditionBitmaskTest extends TestCase
                 ->build(true)
             ;
 
-            self::assertTrue(str_contains($sql, '& 1 = 1'), "Driver {$driver} should support bitmask");
+            Assert::true(str_contains($sql, '& 1 = 1'), "Driver {$driver} should support bitmask");
         }
     }
 
@@ -195,10 +178,7 @@ final class ConditionBitmaskTest extends TestCase
             ->build(true)
         ;
 
-        self::assertSame(
-            "SELECT * FROM `users` WHERE (FIND_IN_SET('admin', `tags`))",
-            $sql
-        );
+        Assert::same($sql, "SELECT * FROM `users` WHERE (FIND_IN_SET('admin', `tags`))");
     }
 
     public function testFindInSetMysqlMultipleValues(): void
@@ -212,9 +192,9 @@ final class ConditionBitmaskTest extends TestCase
             ->build(true)
         ;
 
-        self::assertSame(
-            "SELECT * FROM `users` WHERE (FIND_IN_SET('admin', `tags`) OR FIND_IN_SET('moderator', `tags`))",
-            $sql
+        Assert::same(
+            $sql,
+            "SELECT * FROM `users` WHERE (FIND_IN_SET('admin', `tags`) OR FIND_IN_SET('moderator', `tags`))"
         );
     }
 
@@ -229,10 +209,7 @@ final class ConditionBitmaskTest extends TestCase
             ->build(true)
         ;
 
-        self::assertSame(
-            "SELECT `u`.* FROM `users` AS `u` WHERE (FIND_IN_SET('admin', `u`.`roles`))",
-            $sql
-        );
+        Assert::same($sql, "SELECT `u`.* FROM `users` AS `u` WHERE (FIND_IN_SET('admin', `u`.`roles`))");
     }
 
     public function testFindInSetCombinedWithOtherConditions(): void
@@ -247,17 +224,15 @@ final class ConditionBitmaskTest extends TestCase
             ->build(true)
         ;
 
-        self::assertSame(
-            "SELECT * FROM `users` WHERE (`status` = 'active') AND (FIND_IN_SET('premium', `tags`))",
-            $sql
-        );
+        Assert::same($sql, "SELECT * FROM `users` WHERE (`status` = 'active') AND (FIND_IN_SET('premium', `tags`))");
     }
 
     #[DataProvider('provideFindInSetThrowsExceptionForUnsupportedDriversCases')]
     public function testFindInSetThrowsExceptionForUnsupportedDrivers(string $driver): void
     {
-        $this->expectException(UnsupportedFeatureException::class);
-        $this->expectExceptionMessage("FIND_IN_SET is not supported by driver '{$driver}'");
+        Expect::exception(UnsupportedFeatureException::class)
+            ->withMessageContaining("FIND_IN_SET is not supported by driver '{$driver}'")
+        ;
 
         $qb = $this->createQueryBuilder($driver);
         $qb->select('*')
@@ -293,8 +268,8 @@ final class ConditionBitmaskTest extends TestCase
             ->build(true)
         ;
 
-        self::assertTrue(str_contains($sql, 'FIND_IN_SET('));
-        self::assertTrue(str_contains($sql, '`tags`)'));
+        Assert::true(str_contains($sql, 'FIND_IN_SET('));
+        Assert::true(str_contains($sql, '`tags`)'));
     }
 
     public function testBitmaskInHavingClause(): void
@@ -311,14 +286,21 @@ final class ConditionBitmaskTest extends TestCase
             ->build(true)
         ;
 
-        self::assertSame(
-            'SELECT `user_id`, SUM(`amount`) AS `total` FROM `transactions` '
-            .'GROUP BY `user_id` HAVING ((`user_id` & 1 = 1))',
-            $sql
-        );
+        Assert::same($sql, 'SELECT `user_id`, SUM(`amount`) AS `total` FROM `transactions` '
+        . 'GROUP BY `user_id` HAVING ((`user_id` & 1 = 1))');
     }
 
-    protected function createQueryBuilder(string $driver = QbConsts::DRIVER_MYSQL): QueryBuilder
+    public function testNotBitmaskWithClearedBit(): void
+    {
+        $sql = (new QueryBuilder())->select('*')->from('t')
+            ->where()->notBitmask('flags', [2 => 0, 4 => 1])->end()
+            ->build(true)
+        ;
+
+        Assert::same($sql, 'SELECT * FROM `t` WHERE (NOT ((`flags` & 2 = 0) AND (`flags` & 4 = 4)))');
+    }
+
+    private function createQueryBuilder(string $driver = QbConsts::DRIVER_MYSQL): QueryBuilder
     {
         return new QueryBuilder($driver);
     }

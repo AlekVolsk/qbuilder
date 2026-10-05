@@ -10,6 +10,8 @@ use QBuilder\QueryBuilder;
  * Class for building JOIN conditions.
  * Extends Condition to support all condition methods (bitmask, findInSet, etc).
  * Supports multiple conditions with AND/OR logical operators.
+ *
+ * @api
  */
 class ConditionJoin extends Condition
 {
@@ -39,7 +41,7 @@ class ConditionJoin extends Condition
         array|string|null $target = null,
         ?string $targetTable = null
     ) {
-        $this->joinAliasMarker = "\0qb_join_alias_".bin2hex(random_bytes(8))."\0";
+        $this->joinAliasMarker = "\0qb_join_alias_" . bin2hex(random_bytes(8)) . "\0";
 
         parent::__construct($queryBuilder, 'JOIN');
 
@@ -47,7 +49,7 @@ class ConditionJoin extends Condition
             $targetField = $this->prepareTarget($target, $targetTable);
             $fieldName = $this->formatFieldName($field);
             $targetName = $this->formatFieldName($targetField);
-            $this->addRawCondition($fieldName.' = '.$targetName);
+            $this->addRawCondition($fieldName . ' = ' . $targetName);
         }
     }
 
@@ -106,7 +108,7 @@ class ConditionJoin extends Condition
     #[\Override]
     public function build(): string
     {
-        $prefix = '' === $this->joinAlias ? '' : $this->getDriver()->quoteName($this->joinAlias).'.';
+        $prefix = '' === $this->joinAlias ? '' : $this->getDriver()->quoteName($this->joinAlias) . '.';
 
         return str_replace($this->joinAliasMarker, $prefix, parent::build());
     }
@@ -168,6 +170,6 @@ class ConditionJoin extends Condition
             ? '' === $field->tableOrAlias && ! $field->isExpression() && '*' !== $field->name
             : ! str_contains($field, '.') && '*' !== $field;
 
-        return $isUnqualified ? $this->joinAliasMarker.$formatted : $formatted;
+        return $isUnqualified ? $this->joinAliasMarker . $formatted : $formatted;
     }
 }

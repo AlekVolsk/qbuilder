@@ -9,6 +9,8 @@ namespace QBuilder\Builder;
  *
  * Defines common contract for MySQL (ON DUPLICATE KEY UPDATE)
  * and PostgreSQL (ON CONFLICT ... DO UPDATE).
+ *
+ * @api
  */
 interface ConflictBuilderInterface
 {
@@ -23,16 +25,16 @@ interface ConflictBuilderInterface
     /**
      * Increment field.
      *
-     * @param string           $field Field name
-     * @param float|int|string $value Value to add
+     * @param string                   $field Field name
+     * @param float|int|numeric-string $value Value to add
      */
     public function increment(string $field, float|int|string $value = 1): self;
 
     /**
      * Decrement field.
      *
-     * @param string           $field Field name
-     * @param float|int|string $value Value to subtract
+     * @param string                   $field Field name
+     * @param float|int|numeric-string $value Value to subtract
      */
     public function decrement(string $field, float|int|string $value = 1): self;
 

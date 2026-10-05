@@ -26,6 +26,8 @@ $qb->select('*')
 **Альтернативный синтаксис с замыканием:**
 
 ```php
+use QBuilder\Condition\ConditionBuilder;
+
 $qb->select('*')
     ->from('users')
     ->where(static fn (ConditionBuilder $q): ConditionBuilder => $q->eq('status', 'active'));
@@ -48,6 +50,8 @@ $qb->where()
 **Альтернативный синтаксис:**
 
 ```php
+use QBuilder\Condition\ConditionBuilder;
+
 $qb->where(static fn (ConditionBuilder $q): ConditionBuilder => $q->neq('status', 'deleted'));
 
 // WHERE (`status` != 'deleted')
@@ -69,6 +73,8 @@ $qb->where()
 **Альтернативный синтаксис:**
 
 ```php
+use QBuilder\Condition\ConditionBuilder;
+
 $qb->where(static fn (ConditionBuilder $q): ConditionBuilder =>
     $q->gt('age', 18)->and()->lt('age', 65)
 );
@@ -92,6 +98,8 @@ $qb->where()
 **Альтернативный синтаксис:**
 
 ```php
+use QBuilder\Condition\ConditionBuilder;
+
 $qb->where(static fn (ConditionBuilder $q): ConditionBuilder =>
     $q->gte('price', 100)->and()->lte('price', 1000)
 );
@@ -118,6 +126,8 @@ $qb->where()
 **Альтернативный синтаксис:**
 
 ```php
+use QBuilder\Condition\ConditionBuilder;
+
 $qb->where(static fn (ConditionBuilder $q): ConditionBuilder =>
     $q->eq('status', 'active')
       ->and()->eq('verified', 1)
@@ -143,6 +153,8 @@ $qb->where()
 **Альтернативный синтаксис:**
 
 ```php
+use QBuilder\Condition\ConditionBuilder;
+
 $qb->where(static fn (ConditionBuilder $q): ConditionBuilder =>
     $q->eq('status', 'active')->or()->eq('status', 'pending')
 );
@@ -184,6 +196,8 @@ $qb->where()
 **Альтернативный синтаксис с замыканиями:**
 
 ```php
+use QBuilder\Condition\ConditionBuilder;
+
 $qb->where(static fn (ConditionBuilder $q): ConditionBuilder =>
     $q->eq('country', 'US')
       ->andGroup(static fn (ConditionBuilder $q2): ConditionBuilder => $q2
@@ -212,6 +226,8 @@ $qb->where()
 **Альтернативный синтаксис:**
 
 ```php
+use QBuilder\Condition\ConditionBuilder;
+
 $qb->where(static fn (ConditionBuilder $q): ConditionBuilder =>
     $q->in('status', ['active', 'pending', 'verified'])
 );
@@ -234,6 +250,8 @@ $qb->where()
 **Альтернативный синтаксис:**
 
 ```php
+use QBuilder\Condition\ConditionBuilder;
+
 $qb->where(static fn (ConditionBuilder $q): ConditionBuilder =>
     $q->notIn('status', ['deleted', 'banned'])
 );
@@ -249,7 +267,7 @@ $qb->where(static fn (ConditionBuilder $q): ConditionBuilder =>
 - строка разбивается по запятой, пустые элементы отбрасываются: `in('status', 'active,,pending')` → `IN ('active', 'pending')`;
 - пустой список: `in()` → `1 = 0`, `notIn()` → `1 = 1`.
 
-`NOT IN` со значением `NULL` в списке по стандарту SQL не возвращает строк, но СУБД ведут себя по-разному — билдер передаёт `NULL` без изменений, решение за вызывающим кодом.
+**`NOT IN` с `NULL` в списке никогда не выполняется.** `id NOT IN (1, NULL)` не бывает истинным, поэтому запрос не возвращает ни одной строки — проверено на MySQL, PostgreSQL и SQLite. Билдер передаёт `NULL` без изменений; убирайте `null` из списка `notIn()`, если пустой результат не нужен, а строки с `NULL` оставляйте явным `isNull()`.
 
 ```php
 $qb->where()
@@ -274,6 +292,8 @@ $qb->where()
 **Альтернативный синтаксис:**
 
 ```php
+use QBuilder\Condition\ConditionBuilder;
+
 $qb->where(static fn (ConditionBuilder $q): ConditionBuilder =>
     $q->between('age', 18, 65)
 );
@@ -296,6 +316,8 @@ $qb->where()
 **Альтернативный синтаксис:**
 
 ```php
+use QBuilder\Condition\ConditionBuilder;
+
 $qb->where(static fn (ConditionBuilder $q): ConditionBuilder =>
     $q->notBetween('age', 18, 65)
 );
@@ -318,6 +340,8 @@ $qb->where()
 **Альтернативный синтаксис:**
 
 ```php
+use QBuilder\Condition\ConditionBuilder;
+
 $qb->where(static fn (ConditionBuilder $q): ConditionBuilder =>
     $q->like('name', 'John')
 );
@@ -348,6 +372,7 @@ $qb->where()->like('name', 'John', QbConsts::LIKE_LEFT)->end();
 **Альтернативный синтаксис:**
 
 ```php
+use QBuilder\Condition\ConditionBuilder;
 use QBuilder\QbConsts;
 
 // Содержит (по умолчанию)
@@ -372,6 +397,8 @@ $qb->where(static fn (ConditionBuilder $q): ConditionBuilder =>
 **Значение — буквальная строка поиска.** Символы `%` и `_` в нём экранируются, подстановочные знаки добавляет только тип границы. Для MySQL, PostgreSQL, SQLite и Oracle экранирование идёт через `!` с явным `ESCAPE '!'` — результат не зависит от `sql_mode` и `standard_conforming_strings`; в MS SQL — через `[...]`, в ClickHouse — через `\`. `ESCAPE` добавляется, только если в значении было что экранировать.
 
 ```php
+use QBuilder\QbConsts;
+
 $qb->where()->like('discount', '50%', QbConsts::LIKE_RIGHT)->end();
 // WHERE (`discount` LIKE '50!%%' ESCAPE '!')   — начинается с «50%»
 
@@ -394,6 +421,8 @@ $qb->where()
 **Альтернативный синтаксис:**
 
 ```php
+use QBuilder\Condition\ConditionBuilder;
+
 $qb->where(static fn (ConditionBuilder $q): ConditionBuilder =>
     $q->notLike('name', 'Admin')
 );
@@ -417,6 +446,8 @@ $qb->where()
 **Альтернативный синтаксис:**
 
 ```php
+use QBuilder\Condition\ConditionBuilder;
+
 $qb->where(static fn (ConditionBuilder $q): ConditionBuilder =>
     $q->isNull('deleted_at')->and()->isNotNull('email')
 );
@@ -441,6 +472,8 @@ $qb->where()
 **Альтернативный синтаксис:**
 
 ```php
+use QBuilder\Condition\ConditionBuilder;
+
 $qb->where(static fn (ConditionBuilder $q): ConditionBuilder =>
     $q->eqField('orders', 'user_id', 'users', 'id')
 );
@@ -464,6 +497,8 @@ $qb->where()
 **Альтернативный синтаксис:**
 
 ```php
+use QBuilder\Condition\ConditionBuilder;
+
 $qb->where(static fn (ConditionBuilder $q): ConditionBuilder =>
     $q->gtField('orders', 'total', 'users', 'credit_limit')
       ->and()
@@ -490,6 +525,8 @@ $qb->where()
 **Альтернативный синтаксис:**
 
 ```php
+use QBuilder\Condition\ConditionBuilder;
+
 $qb->where(static fn (ConditionBuilder $q): ConditionBuilder => $q->bitmask('permissions', [1 => 1, 2 => 1, 4 => 0]));
 
 // WHERE ((`permissions` & 1 = 1)) AND ((`permissions` & 2 = 2)) AND ((`permissions` & 4 = 0))
@@ -510,6 +547,8 @@ $qb->where()
 **Альтернативный синтаксис:**
 
 ```php
+use QBuilder\Condition\ConditionBuilder;
+
 $qb->where(static fn (ConditionBuilder $q): ConditionBuilder =>
     $q->notBitmask('permissions', [8 => 1])
 );
@@ -538,6 +577,8 @@ $qb->where()
 **Альтернативный синтаксис:**
 
 ```php
+use QBuilder\Condition\ConditionBuilder;
+
 $qb->where(static fn (ConditionBuilder $q): ConditionBuilder =>
     $q->findInSet('tags', 'admin')
 );
@@ -570,6 +611,8 @@ $qb->where()
 **Альтернативный синтаксис:**
 
 ```php
+use QBuilder\Condition\ConditionBuilder;
+
 $qb->where(static fn (ConditionBuilder $q): ConditionBuilder =>
     $q->eq('status', 'active')->and()->raw('YEAR(created_at) = 2024')
 );

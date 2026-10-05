@@ -14,8 +14,10 @@ use QBuilder\QueryBuilder;
  * MySQL driver for QueryBuilder.
  *
  * Implements specific SQL query building logic for MySQL/MariaDB.
+ *
+ * @internal
  */
-class MysqlDriver extends AbstractDriver
+final class MysqlDriver extends AbstractDriver
 {
     public const string INSERT_ROW_ALIAS = 'new';
 
@@ -60,20 +62,15 @@ class MysqlDriver extends AbstractDriver
         if ($withTies) {
             throw new UnsupportedFeatureException(
                 'MySQL does not support LIMIT WITH TIES. '
-                .'This feature is available in PostgreSQL, MS SQL Server, Oracle, and ClickHouse.'
+                . 'This feature is available in PostgreSQL, MS SQL Server, Oracle, and ClickHouse.'
             );
         }
 
         if (null !== $offset && $offset > 0) {
-            return "\nLIMIT ".$offset.', '.$limit;
+            return "\nLIMIT " . $offset . ', ' . $limit;
         }
 
-        return "\nLIMIT ".$limit;
-    }
-
-    public function getName(): string
-    {
-        return 'mysql';
+        return "\nLIMIT " . $limit;
     }
 
     /**
@@ -123,9 +120,9 @@ class MysqlDriver extends AbstractDriver
         $sql = '';
 
         foreach ($hints as $hint) {
-            $scope = '' === $hint['for'] ? '' : ' FOR '.$hint['for'];
+            $scope = '' === $hint['for'] ? '' : ' FOR ' . $hint['for'];
             $indexes = implode(', ', array_map($this->quoteName(...), $hint['indexes']));
-            $sql .= ' '.$hint['type'].' INDEX'.$scope.' ('.$indexes.')';
+            $sql .= ' ' . $hint['type'] . ' INDEX' . $scope . ' (' . $indexes . ')';
         }
 
         return $sql;

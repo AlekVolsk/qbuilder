@@ -4,18 +4,18 @@ declare(strict_types=1);
 
 namespace QBuilder\Tests;
 
-use PHPUnit\Framework\Attributes\DataProvider;
-use PHPUnit\Framework\TestCase;
 use QBuilder\QbConsts;
 use QBuilder\QueryBuilder;
 use QBuilder\Services\SqlCompactor;
+use Testo\Assert;
+use Testo\Data\DataProvider;
+use Testo\Test;
 
 /**
  * @internal
- *
- * @coversNothing
  */
-final class SqlCompactorTest extends TestCase
+#[Test]
+final class SqlCompactorTest
 {
     public function testCompactRemovesExtraWhitespace(): void
     {
@@ -23,7 +23,7 @@ final class SqlCompactorTest extends TestCase
         $sql = 'SELECT   *   FROM    users   WHERE   id   =   1';
         $result = $compactor->compact($sql);
 
-        self::assertSame('SELECT * FROM users WHERE id = 1', $result);
+        Assert::same($result, 'SELECT * FROM users WHERE id = 1');
     }
 
     public function testCompactPreservesSpacesInSingleQuotedStrings(): void
@@ -32,7 +32,7 @@ final class SqlCompactorTest extends TestCase
         $sql = "SELECT * FROM users WHERE name = 'John   Doe'";
         $result = $compactor->compact($sql);
 
-        self::assertSame("SELECT * FROM users WHERE name = 'John   Doe'", $result);
+        Assert::same($result, "SELECT * FROM users WHERE name = 'John   Doe'");
     }
 
     public function testCompactPreservesSpacesInDoubleQuotedStrings(): void
@@ -41,7 +41,7 @@ final class SqlCompactorTest extends TestCase
         $sql = 'SELECT * FROM users WHERE name = "John   Doe"';
         $result = $compactor->compact($sql);
 
-        self::assertSame('SELECT * FROM users WHERE name = "John   Doe"', $result);
+        Assert::same($result, 'SELECT * FROM users WHERE name = "John   Doe"');
     }
 
     public function testCompactHandlesEscapedSingleQuotes(): void
@@ -50,7 +50,7 @@ final class SqlCompactorTest extends TestCase
         $sql = "SELECT * FROM users WHERE name = 'John''s Name'";
         $result = $compactor->compact($sql);
 
-        self::assertSame("SELECT * FROM users WHERE name = 'John''s Name'", $result);
+        Assert::same($result, "SELECT * FROM users WHERE name = 'John''s Name'");
     }
 
     public function testCompactHandlesEscapedDoubleQuotes(): void
@@ -59,7 +59,7 @@ final class SqlCompactorTest extends TestCase
         $sql = 'SELECT * FROM users WHERE name = "John""s Name"';
         $result = $compactor->compact($sql);
 
-        self::assertSame('SELECT * FROM users WHERE name = "John""s Name"', $result);
+        Assert::same($result, 'SELECT * FROM users WHERE name = "John""s Name"');
     }
 
     public function testCompactHandlesNewlinesInStrings(): void
@@ -68,7 +68,7 @@ final class SqlCompactorTest extends TestCase
         $sql = "SELECT * FROM users WHERE description = 'Line 1\nLine 2'";
         $result = $compactor->compact($sql);
 
-        self::assertSame("SELECT * FROM users WHERE description = 'Line 1\nLine 2'", $result);
+        Assert::same($result, "SELECT * FROM users WHERE description = 'Line 1\nLine 2'");
     }
 
     public function testCompactHandlesMultipleStringLiterals(): void
@@ -77,7 +77,7 @@ final class SqlCompactorTest extends TestCase
         $sql = "SELECT * FROM users WHERE name = 'John' AND city = 'New York'";
         $result = $compactor->compact($sql);
 
-        self::assertSame("SELECT * FROM users WHERE name = 'John' AND city = 'New York'", $result);
+        Assert::same($result, "SELECT * FROM users WHERE name = 'John' AND city = 'New York'");
     }
 
     public function testCompactHandlesMixedQuotes(): void
@@ -86,7 +86,7 @@ final class SqlCompactorTest extends TestCase
         $sql = 'SELECT * FROM users WHERE name = "John" AND city = \'New York\'';
         $result = $compactor->compact($sql);
 
-        self::assertSame('SELECT * FROM users WHERE name = "John" AND city = \'New York\'', $result);
+        Assert::same($result, 'SELECT * FROM users WHERE name = "John" AND city = \'New York\'');
     }
 
     public function testCompactHandlesEmptyString(): void
@@ -94,7 +94,7 @@ final class SqlCompactorTest extends TestCase
         $compactor = new SqlCompactor();
         $result = $compactor->compact('');
 
-        self::assertSame('', $result);
+        Assert::same($result, '');
     }
 
     public function testCompactHandlesOnlyWhitespace(): void
@@ -102,7 +102,7 @@ final class SqlCompactorTest extends TestCase
         $compactor = new SqlCompactor();
         $result = $compactor->compact('   ');
 
-        self::assertSame('', $result);
+        Assert::same($result, '');
     }
 
     public function testCompactHandlesTabsAndNewlines(): void
@@ -111,19 +111,19 @@ final class SqlCompactorTest extends TestCase
         $sql = "SELECT\t*\nFROM\n\tusers\nWHERE\n\tid = 1";
         $result = $compactor->compact($sql);
 
-        self::assertSame('SELECT * FROM users WHERE id = 1', $result);
+        Assert::same($result, 'SELECT * FROM users WHERE id = 1');
     }
 
     public function testCompactHandlesComplexQuery(): void
     {
         $compactor = new SqlCompactor();
         $sql = "SELECT   u.id,   u.name   FROM   users   u   WHERE   u.name   =   'John   Doe'   "
-            .'AND   u.city   =   "New   York"';
+            . 'AND   u.city   =   "New   York"';
         $result = $compactor->compact($sql);
 
-        self::assertSame(
-            "SELECT u.id, u.name FROM users u WHERE u.name = 'John   Doe' AND u.city = \"New   York\"",
-            $result
+        Assert::same(
+            $result,
+            "SELECT u.id, u.name FROM users u WHERE u.name = 'John   Doe' AND u.city = \"New   York\""
         );
     }
 
@@ -133,7 +133,7 @@ final class SqlCompactorTest extends TestCase
         $sql = "'test'   SELECT   *   FROM   users";
         $result = $compactor->compact($sql);
 
-        self::assertSame("'test' SELECT * FROM users", $result);
+        Assert::same($result, "'test' SELECT * FROM users");
     }
 
     public function testCompactHandlesStringAtEnd(): void
@@ -142,7 +142,7 @@ final class SqlCompactorTest extends TestCase
         $sql = "SELECT   *   FROM   users   WHERE   name   =   'test'";
         $result = $compactor->compact($sql);
 
-        self::assertSame("SELECT * FROM users WHERE name = 'test'", $result);
+        Assert::same($result, "SELECT * FROM users WHERE name = 'test'");
     }
 
     public function testCompactHandlesConsecutiveEscapedQuotes(): void
@@ -151,7 +151,7 @@ final class SqlCompactorTest extends TestCase
         $sql = "SELECT * FROM users WHERE name = 'John''''s Name'";
         $result = $compactor->compact($sql);
 
-        self::assertSame("SELECT * FROM users WHERE name = 'John''''s Name'", $result);
+        Assert::same($result, "SELECT * FROM users WHERE name = 'John''''s Name'");
     }
 
     #[DataProvider('provideCompactHandlesMultilineStringsCases')]
@@ -160,7 +160,7 @@ final class SqlCompactorTest extends TestCase
         $compactor = new SqlCompactor();
         $result = $compactor->compact($sql);
 
-        self::assertSame($expected, $result);
+        Assert::same($result, $expected);
     }
 
     /**
@@ -184,9 +184,7 @@ final class SqlCompactorTest extends TestCase
         $sql = '   SELECT   *   FROM   users   ';
         $result = $compactor->compact($sql);
 
-        self::assertSame('SELECT * FROM users', $result);
-        self::assertStringStartsNotWith(' ', $result);
-        self::assertStringEndsNotWith(' ', $result);
+        Assert::same($result, 'SELECT * FROM users');
     }
 
     public function testCompactHandlesUnclosedString(): void
@@ -195,7 +193,7 @@ final class SqlCompactorTest extends TestCase
         $sql = "SELECT * FROM users WHERE name = 'John";
         $result = $compactor->compact($sql);
 
-        self::assertStringContainsString("'John", $result);
+        Assert::same($result, 'SELECT * FROM users WHERE name = \'John');
     }
 
     public function testCompactHandlesQuoteAtEndOfString(): void
@@ -204,55 +202,49 @@ final class SqlCompactorTest extends TestCase
         $sql = "SELECT * FROM users WHERE name = 'John'";
         $result = $compactor->compact($sql);
 
-        self::assertSame("SELECT * FROM users WHERE name = 'John'", $result);
+        Assert::same($result, "SELECT * FROM users WHERE name = 'John'");
     }
 
     public function testCompactKeepsLiteralWithBackslashEscapedQuote(): void
     {
         $sql = "SELECT *\nFROM t\nWHERE name = 'O\\'Neil  x'  AND  id = 1";
 
-        self::assertSame(
-            "SELECT * FROM t WHERE name = 'O\\'Neil  x' AND id = 1",
-            (new SqlCompactor(true))->compact($sql)
-        );
+        Assert::same((new SqlCompactor(true))->compact($sql), "SELECT * FROM t WHERE name = 'O\\'Neil  x' AND id = 1");
     }
 
     public function testCompactKeepsLiteralEndingWithEscapedBackslash(): void
     {
         $sql = "SELECT 'C:\\\\dir\\\\'  ,  'a  b'";
 
-        self::assertSame("SELECT 'C:\\\\dir\\\\' , 'a  b'", (new SqlCompactor(true))->compact($sql));
+        Assert::same((new SqlCompactor(true))->compact($sql), "SELECT 'C:\\\\dir\\\\' , 'a  b'");
     }
 
     public function testCompactTreatsBackslashAsOrdinaryWithoutBackslashEscapes(): void
     {
         $sql = "SELECT 'a\\'  ,  'b  c'";
 
-        self::assertSame("SELECT 'a\\' , 'b  c'", (new SqlCompactor())->compact($sql));
+        Assert::same((new SqlCompactor())->compact($sql), "SELECT 'a\\' , 'b  c'");
     }
 
     public function testCompactKeepsNewlineAfterLineComment(): void
     {
         $sql = "SELECT id -- primary key\n    FROM   t\nWHERE id = 1";
 
-        self::assertSame("SELECT id -- primary key\nFROM t WHERE id = 1", (new SqlCompactor())->compact($sql));
+        Assert::same((new SqlCompactor())->compact($sql), "SELECT id -- primary key\nFROM t WHERE id = 1");
     }
 
     public function testCompactKeepsBlockCommentAsIs(): void
     {
         $sql = "SELECT /*+ NO_INDEX(t  idx) it's */  id\nFROM t";
 
-        self::assertSame("SELECT /*+ NO_INDEX(t  idx) it's */ id FROM t", (new SqlCompactor())->compact($sql));
+        Assert::same((new SqlCompactor())->compact($sql), "SELECT /*+ NO_INDEX(t  idx) it's */ id FROM t");
     }
 
     public function testCompactKeepsQuotedIdentifiers(): void
     {
         $sql = "SELECT `my  col`,  [other  col],  \"third  col\"\nFROM t";
 
-        self::assertSame(
-            'SELECT `my  col`, [other  col], "third  col" FROM t',
-            (new SqlCompactor())->compact($sql)
-        );
+        Assert::same((new SqlCompactor())->compact($sql), 'SELECT `my  col`, [other  col], "third  col" FROM t');
     }
 
     public function testBuilderCompactKeepsRawMysqlLiteral(): void
@@ -262,6 +254,6 @@ final class SqlCompactorTest extends TestCase
             ->build(true)
         ;
 
-        self::assertSame("SELECT * FROM `t` WHERE (`name` = 'O\\'Neil  x')", $sql);
+        Assert::same($sql, "SELECT * FROM `t` WHERE (`name` = 'O\\'Neil  x')");
     }
 }

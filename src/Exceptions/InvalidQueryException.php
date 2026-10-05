@@ -11,9 +11,12 @@ namespace QBuilder\Exceptions;
  * - Subquery must be SELECT statement
  * - Invalid comparison operators
  * - Wrong query type for operation
+ *
+ * @api
  */
 class InvalidQueryException extends QBuilderException
 {
+    // phpcs:ignore Generic.CodeAnalysis.UselessOverridingMethod -- overrides default message and code
     public function __construct(
         string $message = 'Invalid or malformed query',
         int $code = 500,

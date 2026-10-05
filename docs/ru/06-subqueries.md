@@ -3,6 +3,8 @@
 ## Подзапрос в SELECT
 
 ```php
+use QBuilder\Condition\Field;
+
 $subquery = $qb->subQuery()
     ->select(Field::set('COUNT(*)'))
     ->from('orders')
@@ -111,6 +113,8 @@ $sql = $qb->select('*')
 ## Подзапрос в WHERE (сравнение)
 
 ```php
+use QBuilder\Condition\Field;
+
 $subquery = $qb->subQuery()
     ->select(Field::set('AVG(price)'))
     ->from('products')
@@ -132,6 +136,10 @@ $sql = $qb->select('*')
 ## Подзапрос в FROM
 
 ```php
+use QBuilder\Condition\ConditionBy;
+use QBuilder\Condition\ConditionJoin;
+use QBuilder\Condition\Field;
+
 $subquery = $qb->subQuery()
     ->select('user_id', 'SUM(total) AS total_spent')
     ->from('orders')
@@ -154,6 +162,10 @@ $sql = $qb->select(
 ## JOIN с подзапросом
 
 ```php
+use QBuilder\Condition\ConditionBy;
+use QBuilder\Condition\ConditionJoin;
+use QBuilder\Condition\Field;
+
 $subquery = $qb->subQuery()
     ->select(
         Field::set('user_id', 'orders'),
@@ -187,6 +199,8 @@ $sql = $qb->select(
 ## Вложенные подзапросы
 
 ```php
+use QBuilder\Condition\Field;
+
 $innerSubquery = $qb->subQuery()
     ->select(Field::set('MAX(created_at)'))
     ->from('orders')

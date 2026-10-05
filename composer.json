@@ -35,9 +35,15 @@
         "ext-pcov": "PCOV extension for code coverage analysis (recommended for faster coverage)"
     },
     "require-dev": {
-        "phpunit/phpunit": "^13.3",
         "phpstan/phpstan": "^2.2",
-        "friendsofphp/php-cs-fixer": "^3.95"
+        "friendsofphp/php-cs-fixer": "^3.95",
+        "squizlabs/php_codesniffer": "^4.0",
+        "slevomat/coding-standard": "^8.31",
+        "phpcompatibility/php-compatibility": "^10.0@alpha",
+        "phpstan/phpstan-strict-rules": "^2.0",
+        "shipmonk/dead-code-detector": "^1.4",
+        "spaze/phpstan-disallowed-calls": "^4.14",
+        "testo/testo": "^0.10.55"
     },
     "autoload": {
         "psr-4": {
@@ -46,23 +52,36 @@
     },
     "autoload-dev": {
         "psr-4": {
-            "QBuilder\\Tests\\": "tests/"
+            "QBuilder\\Tests\\": "tests/",
+            "QBuilder\\Tools\\": "tools/"
         }
     },
     "scripts": {
-        "test": "phpunit",
-        "test:coverage": "phpunit --coverage-html coverage",
-        "test:coverage-text": "phpunit --coverage-text",
-        "test:coverage-clover": "phpunit --coverage-clover coverage.xml",
+        "test": "testo",
+        "test:unit": "testo --suite=Unit",
+        "test:integration": "testo --suite=Integration",
+        "test:coverage-clover": "testo --coverage --coverage-clover=build-dev/coverage/clover.xml",
         "phpstan": "phpstan analyse",
         "phpstan:baseline": "phpstan analyse --generate-baseline",
+        "phpcs": "phpcs",
+        "phpcbf": "phpcbf",
         "cs-fix": "php-cs-fixer fix",
-        "cs-check": "php-cs-fixer fix --dry-run --diff"
+        "cs-check": "php-cs-fixer fix --dry-run --diff",
+        "lint": [
+            "@cs-check",
+            "@phpcs",
+            "@phpstan"
+        ]
     },
     "support": {
         "issues": "https://github.com/alekvolsk/qbuilder/issues",
         "source": "https://github.com/alekvolsk/qbuilder"
     },
     "minimum-stability": "stable",
-    "prefer-stable": true
+    "prefer-stable": true,
+    "config": {
+        "allow-plugins": {
+            "dealerdirect/phpcodesniffer-composer-installer": true
+        }
+    }
 }

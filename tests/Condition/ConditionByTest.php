@@ -4,34 +4,35 @@ declare(strict_types=1);
 
 namespace QBuilder\Tests;
 
-use PHPUnit\Framework\TestCase;
 use QBuilder\Condition\ConditionBy;
 use QBuilder\Condition\Field;
 use QBuilder\Exceptions\InvalidIdentifierException;
 use QBuilder\Exceptions\InvalidQueryException;
 use QBuilder\QbConsts;
+use Testo\Assert;
+use Testo\Expect;
+use Testo\Test;
 
 /**
  * @internal
- *
- * @coversNothing
  */
-final class ConditionByTest extends TestCase
+#[Test]
+final class ConditionByTest
 {
     public function testOrderByCreatesOrderByBuilder(): void
     {
         $builder = ConditionBy::orderBy();
 
-        self::assertInstanceOf(ConditionBy::class, $builder);
-        self::assertSame(QbConsts::TYPE_ORDER, $builder->getType());
+        Assert::instanceOf($builder, ConditionBy::class);
+        Assert::same($builder->getType(), QbConsts::TYPE_ORDER);
     }
 
     public function testGroupByCreatesGroupByBuilder(): void
     {
         $builder = ConditionBy::groupBy();
 
-        self::assertInstanceOf(ConditionBy::class, $builder);
-        self::assertSame(QbConsts::TYPE_GROUP, $builder->getType());
+        Assert::instanceOf($builder, ConditionBy::class);
+        Assert::same($builder->getType(), QbConsts::TYPE_GROUP);
     }
 
     public function testAddForOrderByWithDirection(): void
@@ -41,13 +42,13 @@ final class ConditionByTest extends TestCase
         $builder->add('created_at', 'users', QbConsts::ORDER_DESC);
 
         $items = $builder->getItems();
-        self::assertCount(2, $items);
-        self::assertArrayHasKey('direction', $items[0]);
+        Assert::count($items, 2);
+        Assert::array($items[0])->hasKeys('direction');
         $direction0 = $items[0]['direction'] ?? null;
-        self::assertSame(QbConsts::ORDER_ASC, $direction0);
-        self::assertArrayHasKey('direction', $items[1]);
+        Assert::same($direction0, QbConsts::ORDER_ASC);
+        Assert::array($items[1])->hasKeys('direction');
         $direction1 = $items[1]['direction'] ?? null;
-        self::assertSame(QbConsts::ORDER_DESC, $direction1);
+        Assert::same($direction1, QbConsts::ORDER_DESC);
     }
 
     public function testAddForOrderByWithoutDirectionDefaultsToAsc(): void
@@ -56,10 +57,10 @@ final class ConditionByTest extends TestCase
         $builder->add('name');
 
         $items = $builder->getItems();
-        self::assertCount(1, $items);
-        self::assertArrayHasKey('direction', $items[0]);
+        Assert::count($items, 1);
+        Assert::array($items[0])->hasKeys('direction');
         $direction = $items[0]['direction'] ?? null;
-        self::assertSame(QbConsts::ORDER_ASC, $direction);
+        Assert::same($direction, QbConsts::ORDER_ASC);
     }
 
     public function testAddForGroupByIgnoresDirection(): void
@@ -68,8 +69,8 @@ final class ConditionByTest extends TestCase
         $builder->add('status', '', QbConsts::ORDER_DESC);
 
         $items = $builder->getItems();
-        self::assertCount(1, $items);
-        self::assertArrayNotHasKey('direction', $items[0]);
+        Assert::count($items, 1);
+        Assert::array($items[0])->doesNotHaveKeys('direction');
     }
 
     public function testAddForGroupBy(): void
@@ -79,9 +80,9 @@ final class ConditionByTest extends TestCase
         $builder->add('status', 'orders');
 
         $items = $builder->getItems();
-        self::assertCount(2, $items);
-        self::assertInstanceOf(Field::class, $items[0]['field']);
-        self::assertInstanceOf(Field::class, $items[1]['field']);
+        Assert::count($items, 2);
+        Assert::instanceOf($items[0]['field'], Field::class);
+        Assert::instanceOf($items[1]['field'], Field::class);
     }
 
     public function testAscForOrderBy(): void
@@ -91,13 +92,13 @@ final class ConditionByTest extends TestCase
         $builder->asc('created_at', 'users');
 
         $items = $builder->getItems();
-        self::assertCount(2, $items);
-        self::assertArrayHasKey('direction', $items[0]);
+        Assert::count($items, 2);
+        Assert::array($items[0])->hasKeys('direction');
         $direction0 = $items[0]['direction'] ?? null;
-        self::assertSame(QbConsts::ORDER_ASC, $direction0);
-        self::assertArrayHasKey('direction', $items[1]);
+        Assert::same($direction0, QbConsts::ORDER_ASC);
+        Assert::array($items[1])->hasKeys('direction');
         $direction1 = $items[1]['direction'] ?? null;
-        self::assertSame(QbConsts::ORDER_ASC, $direction1);
+        Assert::same($direction1, QbConsts::ORDER_ASC);
     }
 
     public function testDescForOrderBy(): void
@@ -107,21 +108,22 @@ final class ConditionByTest extends TestCase
         $builder->desc('created_at', 'users');
 
         $items = $builder->getItems();
-        self::assertCount(2, $items);
-        self::assertArrayHasKey('direction', $items[0]);
+        Assert::count($items, 2);
+        Assert::array($items[0])->hasKeys('direction');
         $direction0 = $items[0]['direction'] ?? null;
-        self::assertSame(QbConsts::ORDER_DESC, $direction0);
-        self::assertArrayHasKey('direction', $items[1]);
+        Assert::same($direction0, QbConsts::ORDER_DESC);
+        Assert::array($items[1])->hasKeys('direction');
         $direction1 = $items[1]['direction'] ?? null;
-        self::assertSame(QbConsts::ORDER_DESC, $direction1);
+        Assert::same($direction1, QbConsts::ORDER_DESC);
     }
 
     public function testAscThrowsExceptionForGroupBy(): void
     {
         $builder = ConditionBy::groupBy();
 
-        $this->expectException(InvalidQueryException::class);
-        $this->expectExceptionMessage('Method asc() is only available for ORDER BY');
+        Expect::exception(InvalidQueryException::class)
+            ->withMessageContaining('Method asc() is only available for ORDER BY')
+        ;
 
         $builder->asc('name');
     }
@@ -130,8 +132,9 @@ final class ConditionByTest extends TestCase
     {
         $builder = ConditionBy::groupBy();
 
-        $this->expectException(InvalidQueryException::class);
-        $this->expectExceptionMessage('Method desc() is only available for ORDER BY');
+        Expect::exception(InvalidQueryException::class)
+            ->withMessageContaining('Method desc() is only available for ORDER BY')
+        ;
 
         $builder->desc('name');
     }
@@ -142,11 +145,11 @@ final class ConditionByTest extends TestCase
         $builder->asc('name')->desc('created_at');
 
         $items = $builder->getItems();
-        self::assertCount(2, $items);
-        self::assertArrayHasKey('field', $items[0]);
-        self::assertArrayHasKey('direction', $items[0]);
-        self::assertArrayHasKey('field', $items[1]);
-        self::assertArrayHasKey('direction', $items[1]);
+        Assert::count($items, 2);
+        Assert::array($items[0])->hasKeys('field');
+        Assert::array($items[0])->hasKeys('direction');
+        Assert::array($items[1])->hasKeys('field');
+        Assert::array($items[1])->hasKeys('direction');
     }
 
     public function testGetFieldsReturnsArrayOfFields(): void
@@ -155,16 +158,16 @@ final class ConditionByTest extends TestCase
         $builder->add('user_id')->add('status', 'orders');
 
         $fields = $builder->getFields();
-        self::assertCount(2, $fields);
-        self::assertInstanceOf(Field::class, $fields[0]);
-        self::assertInstanceOf(Field::class, $fields[1]);
+        Assert::count($fields, 2);
+        Assert::instanceOf($fields[0], Field::class);
+        Assert::instanceOf($fields[1], Field::class);
     }
 
     public function testIsEmptyReturnsTrueForEmptyBuilder(): void
     {
         $builder = ConditionBy::orderBy();
 
-        self::assertTrue($builder->isEmpty());
+        Assert::true($builder->isEmpty());
     }
 
     public function testIsEmptyReturnsFalseForNonEmptyBuilder(): void
@@ -172,21 +175,21 @@ final class ConditionByTest extends TestCase
         $builder = ConditionBy::orderBy();
         $builder->asc('name');
 
-        self::assertFalse($builder->isEmpty());
+        Assert::false($builder->isEmpty());
     }
 
     public function testGetTypeReturnsOrderForOrderBy(): void
     {
         $builder = ConditionBy::orderBy();
 
-        self::assertSame(QbConsts::TYPE_ORDER, $builder->getType());
+        Assert::same($builder->getType(), QbConsts::TYPE_ORDER);
     }
 
     public function testGetTypeReturnsGroupForGroupBy(): void
     {
         $builder = ConditionBy::groupBy();
 
-        self::assertSame(QbConsts::TYPE_GROUP, $builder->getType());
+        Assert::same($builder->getType(), QbConsts::TYPE_GROUP);
     }
 
     public function testChainingMethods(): void
@@ -197,8 +200,8 @@ final class ConditionByTest extends TestCase
             ->asc('status', 'orders')
         ;
 
-        self::assertCount(3, $builder->getItems());
-        self::assertFalse($builder->isEmpty());
+        Assert::count($builder->getItems(), 3);
+        Assert::false($builder->isEmpty());
     }
 
     public function testAddWithTableAlias(): void
@@ -207,8 +210,8 @@ final class ConditionByTest extends TestCase
         $builder->add('id', 'users', QbConsts::ORDER_ASC);
 
         $items = $builder->getItems();
-        self::assertCount(1, $items);
-        self::assertSame('users', $items[0]['field']->tableOrAlias);
+        Assert::count($items, 1);
+        Assert::same($items[0]['field']->tableOrAlias, 'users');
     }
 
     public function testAddCreatesFieldWithCorrectName(): void
@@ -217,7 +220,7 @@ final class ConditionByTest extends TestCase
         $builder->add('status');
 
         $items = $builder->getItems();
-        self::assertSame('status', $items[0]['field']->name);
+        Assert::same($items[0]['field']->name, 'status');
     }
 
     public function testMultipleAddCallsForGroupBy(): void
@@ -229,14 +232,14 @@ final class ConditionByTest extends TestCase
         ;
 
         $items = $builder->getItems();
-        self::assertCount(3, $items);
+        Assert::count($items, 3);
     }
 
     public function testAddWithInvalidDirectionThrowsException(): void
     {
         $builder = ConditionBy::orderBy();
 
-        $this->expectException(InvalidIdentifierException::class);
+        Expect::exception(InvalidIdentifierException::class);
 
         $builder->add('name', '', 'INVALID');
     }
@@ -250,14 +253,14 @@ final class ConditionByTest extends TestCase
         ;
 
         $items = $builder->getItems();
-        self::assertArrayHasKey('direction', $items[0]);
+        Assert::array($items[0])->hasKeys('direction');
         $direction0 = $items[0]['direction'] ?? null;
-        self::assertSame(QbConsts::ORDER_ASC, $direction0);
-        self::assertArrayHasKey('direction', $items[1]);
+        Assert::same($direction0, QbConsts::ORDER_ASC);
+        Assert::array($items[1])->hasKeys('direction');
         $direction1 = $items[1]['direction'] ?? null;
-        self::assertSame(QbConsts::ORDER_DESC, $direction1);
-        self::assertArrayHasKey('direction', $items[2]);
+        Assert::same($direction1, QbConsts::ORDER_DESC);
+        Assert::array($items[2])->hasKeys('direction');
         $direction2 = $items[2]['direction'] ?? null;
-        self::assertSame(QbConsts::ORDER_ASC, $direction2);
+        Assert::same($direction2, QbConsts::ORDER_ASC);
     }
 }

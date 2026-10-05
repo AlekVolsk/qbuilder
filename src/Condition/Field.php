@@ -14,6 +14,8 @@ use QBuilder\Services\SqlSecurity;
  * Universal class for representing a database field.
  * Can contain field name, table/alias and optionally field alias.
  * Supports SQL expressions with aggregate functions and calculations.
+ *
+ * @api
  */
 class Field
 {
@@ -194,17 +196,17 @@ class Field
             $allFunctions = SqlSecurity::getSqlFunctions($driver);
 
             foreach ($allFunctions as $func) {
-                if (preg_match('/\b'.preg_quote($func, '/').'\s*\(/i', $field)) {
+                if (1 === preg_match('/\b' . preg_quote($func, '/') . '\s*\(/i', $field)) {
                     return true;
                 }
             }
         }
 
-        if (preg_match('/[\+\-\*\/\%]/', $field)) {
+        if (1 === preg_match('/[\+\-\*\/\%]/', $field)) {
             return true;
         }
 
-        if (preg_match('/\bCASE\b/i', $field)) {
+        if (1 === preg_match('/\bCASE\b/i', $field)) {
             return true;
         }
 
@@ -215,10 +217,10 @@ class Field
      * Detect if string is a SQL expression.
      * Uses driver-specific function list if provided for better accuracy.
      *
-     * @param string      $field  Field name or expression
-     * @param null|string $driver Optional driver name for driver-specific function detection
+     * @param string $field  Field name or expression
+     * @param string $driver Driver name for driver-specific function detection
      */
-    protected function detectExpression(string $field, ?string $driver = null): bool
+    protected function detectExpression(string $field, string $driver): bool
     {
         if ('*' === $field) {
             return false;
@@ -228,21 +230,19 @@ class Field
             return true;
         }
 
-        $allFunctions = null !== $driver
-            ? SqlSecurity::getSqlFunctions($driver)
-            : SqlSecurity::getSqlFunctions();
+        $allFunctions = SqlSecurity::getSqlFunctions($driver);
 
         foreach ($allFunctions as $func) {
-            if (preg_match('/\b'.preg_quote($func, '/').'\s*\(/i', $field)) {
+            if (1 === preg_match('/\b' . preg_quote($func, '/') . '\s*\(/i', $field)) {
                 return true;
             }
         }
 
-        if (preg_match('/[\+\-\*\/\%]/', $field)) {
+        if (1 === preg_match('/[\+\-\*\/\%]/', $field)) {
             return true;
         }
 
-        if (preg_match('/\bCASE\b/i', $field)) {
+        if (1 === preg_match('/\bCASE\b/i', $field)) {
             return true;
         }
 

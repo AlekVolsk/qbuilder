@@ -13,6 +13,8 @@ use QBuilder\Services\SqlSecurity;
 /**
  * Abstract base class for condition builders.
  * Contains common methods for building SQL conditions (WHERE, HAVING, JOIN).
+ *
+ * @api
  */
 abstract class Condition
 {
@@ -171,7 +173,7 @@ abstract class Condition
     public function isNull(Field|string $field): static
     {
         $fieldName = $this->formatFieldName($field);
-        $this->addRawCondition($fieldName.' IS NULL');
+        $this->addRawCondition($fieldName . ' IS NULL');
 
         return $this;
     }
@@ -184,7 +186,7 @@ abstract class Condition
     public function isNotNull(Field|string $field): static
     {
         $fieldName = $this->formatFieldName($field);
-        $this->addRawCondition($fieldName.' IS NOT NULL');
+        $this->addRawCondition($fieldName . ' IS NOT NULL');
 
         return $this;
     }
@@ -205,7 +207,7 @@ abstract class Condition
         $minValue = $this->formatValue($min);
         $maxValue = $this->formatValue($max);
 
-        $this->addRawCondition($fieldName.' BETWEEN '.$minValue.' AND '.$maxValue);
+        $this->addRawCondition($fieldName . ' BETWEEN ' . $minValue . ' AND ' . $maxValue);
 
         return $this;
     }
@@ -226,7 +228,7 @@ abstract class Condition
         $minValue = $this->formatValue($min);
         $maxValue = $this->formatValue($max);
 
-        $this->addRawCondition($fieldName.' NOT BETWEEN '.$minValue.' AND '.$maxValue);
+        $this->addRawCondition($fieldName . ' NOT BETWEEN ' . $minValue . ' AND ' . $maxValue);
 
         return $this;
     }
@@ -317,7 +319,7 @@ abstract class Condition
         }
 
         if ([] !== $conditions) {
-            $this->addRawCondition('NOT ('.implode(' AND ', $conditions).')');
+            $this->addRawCondition('NOT (' . implode(' AND ', $conditions) . ')');
         }
 
         return $this;
@@ -349,8 +351,8 @@ abstract class Condition
         if (! \in_array($driverName, [QbConsts::DRIVER_MYSQL, QbConsts::DRIVER_PDO_MYSQL], true)) {
             throw new UnsupportedFeatureException(
                 "FIND_IN_SET is not supported by driver '{$driverName}'. "
-                    .'This function is only available in MySQL/MariaDB. '
-                    .'Consider using alternative approaches like JSON fields or normalized tables.'
+                    . 'This function is only available in MySQL/MariaDB. '
+                    . 'Consider using alternative approaches like JSON fields or normalized tables.'
             );
         }
 
@@ -386,7 +388,7 @@ abstract class Condition
         }
         $sqlParts = $this->conditions;
 
-        return ' '.implode(' ', $sqlParts);
+        return ' ' . implode(' ', $sqlParts);
     }
 
     /**
@@ -530,7 +532,7 @@ abstract class Condition
         $fieldName = $this->formatFieldName($field);
         $valueStr = $this->formatValue($value);
 
-        $condition = $fieldName.' '.$operator.' '.$valueStr;
+        $condition = $fieldName . ' ' . $operator . ' ' . $valueStr;
         $this->addRawCondition($condition);
     }
 
@@ -545,7 +547,7 @@ abstract class Condition
             $this->conditions[] = $this->currentLogic;
         }
 
-        $this->conditions[] = '('.$condition.')';
+        $this->conditions[] = '(' . $condition . ')';
 
         $this->currentLogic = 'AND';
     }
@@ -575,7 +577,7 @@ abstract class Condition
                 SqlSecurity::validateTableName($tableOrAlias, $this->queryBuilder->getDriver());
                 SqlSecurity::validateFieldName($fieldName, $this->queryBuilder->getDriver());
 
-                return $driver->quoteName($tableOrAlias).'.'.$driver->quoteName($fieldName);
+                return $driver->quoteName($tableOrAlias) . '.' . $driver->quoteName($fieldName);
             }
 
             SqlSecurity::validateFieldName($fieldName, $this->queryBuilder->getDriver());
@@ -588,7 +590,7 @@ abstract class Condition
             SqlSecurity::validateTableName($table, $this->queryBuilder->getDriver());
             SqlSecurity::validateFieldName($fieldName, $this->queryBuilder->getDriver());
 
-            return $driver->quoteName($table).'.'.$driver->quoteName($fieldName);
+            return $driver->quoteName($table) . '.' . $driver->quoteName($fieldName);
         }
 
         SqlSecurity::validateFieldName($field, $this->queryBuilder->getDriver());
@@ -633,7 +635,7 @@ abstract class Condition
         }
 
         $valuesList = implode(', ', array_map(fn ($v): string => $this->formatValue($v), $values));
-        $this->addRawCondition($this->formatFieldName($field).' '.$operator.' ('.$valuesList.')');
+        $this->addRawCondition($this->formatFieldName($field) . ' ' . $operator . ' (' . $valuesList . ')');
 
         return $this;
     }
@@ -656,7 +658,7 @@ abstract class Condition
         $pattern = $driver->quoteValue($this->applyLikeBoundary($escapedValue, $boundary));
         $escapeClause = $escapedValue === $value ? '' : $driver->getLikeEscapeClause();
 
-        $this->addRawCondition($this->formatFieldName($field).' '.$operator.' '.$pattern.$escapeClause);
+        $this->addRawCondition($this->formatFieldName($field) . ' ' . $operator . ' ' . $pattern . $escapeClause);
 
         return $this;
     }
@@ -672,9 +674,9 @@ abstract class Condition
     protected function applyLikeBoundary(string $value, string $boundary): string
     {
         return match ($boundary) {
-            QbConsts::LIKE_LEFT => '%'.$value,
-            QbConsts::LIKE_RIGHT => $value.'%',
-            default => '%'.$value.'%',
+            QbConsts::LIKE_LEFT => '%' . $value,
+            QbConsts::LIKE_RIGHT => $value . '%',
+            default => '%' . $value . '%',
         };
     }
 
@@ -710,7 +712,7 @@ abstract class Condition
             $field2Name = $this->formatFieldName($field2);
         }
 
-        $this->addRawCondition($field1Name.' '.$operator.' '.$field2Name);
+        $this->addRawCondition($field1Name . ' ' . $operator . ' ' . $field2Name);
 
         return $this;
     }

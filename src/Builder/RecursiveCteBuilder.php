@@ -36,6 +36,8 @@ use QBuilder\Services\SqlSecurity;
  *            ->orderBy(ConditionBy::orderBy()->asc('path'))
  *     )
  *     ->build();
+ *
+ * @api
  */
 class RecursiveCteBuilder
 {
@@ -168,7 +170,7 @@ class RecursiveCteBuilder
         }
 
         $driver = $this->getDriverInstance();
-        $sql = 'WITH RECURSIVE '.$driver->quoteName($this->cteName)." AS (\n";
+        $sql = 'WITH RECURSIVE ' . $driver->quoteName($this->cteName) . " AS (\n";
 
         $sql .= $this->indentQuery($this->baseQuery->build());
 
@@ -234,7 +236,7 @@ class RecursiveCteBuilder
         $indentedLines = [];
 
         foreach ($lines as $line) {
-            $indentedLines[] = '    '.$line;
+            $indentedLines[] = '    ' . $line;
         }
 
         return implode("\n", $indentedLines);

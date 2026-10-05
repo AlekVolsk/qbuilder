@@ -4,18 +4,19 @@ declare(strict_types=1);
 
 namespace QBuilder\Tests;
 
-use PHPUnit\Framework\TestCase;
 use QBuilder\Condition\ConditionBy;
 use QBuilder\Exceptions\InvalidIdentifierException;
 use QBuilder\QbConsts;
 use QBuilder\QueryBuilder;
+use Testo\Assert;
+use Testo\Expect;
+use Testo\Test;
 
 /**
  * @internal
- *
- * @coversNothing
  */
-final class MssqlSqlBuilderTest extends TestCase
+#[Test]
+final class MssqlSqlBuilderTest
 {
     public function testBuildSelectWithTopClause(): void
     {
@@ -26,8 +27,7 @@ final class MssqlSqlBuilderTest extends TestCase
             ->build(true)
         ;
 
-        self::assertStringContainsString('TOP 10', $sql);
-        self::assertStringNotContainsString('LIMIT', $sql);
+        Assert::same($sql, 'SELECT TOP 10 * FROM [users]');
     }
 
     public function testBuildSelectWithTopWithTies(): void
@@ -40,7 +40,7 @@ final class MssqlSqlBuilderTest extends TestCase
             ->build(true)
         ;
 
-        self::assertStringContainsString('TOP 10 WITH TIES', $sql);
+        Assert::same($sql, 'SELECT TOP 10 WITH TIES * FROM [users] ORDER BY [name] ASC');
     }
 
     public function testBuildSelectWithOffsetRequiresOrderBy(): void
@@ -52,8 +52,7 @@ final class MssqlSqlBuilderTest extends TestCase
             ->build(true)
         ;
 
-        self::assertStringContainsString('ORDER BY (SELECT NULL)', $sql);
-        self::assertStringContainsString('OFFSET', $sql);
+        Assert::same($sql, 'SELECT * FROM [users] ORDER BY (SELECT NULL) OFFSET 20 ROWS FETCH NEXT 10 ROWS ONLY');
     }
 
     public function testBuildSelectWithOffsetAndOrderBy(): void
@@ -66,9 +65,7 @@ final class MssqlSqlBuilderTest extends TestCase
             ->build(true)
         ;
 
-        self::assertStringContainsString('ORDER BY', $sql);
-        self::assertStringContainsString('OFFSET', $sql);
-        self::assertStringNotContainsString('ORDER BY (SELECT NULL)', $sql);
+        Assert::same($sql, 'SELECT * FROM [users] ORDER BY [name] ASC OFFSET 20 ROWS FETCH NEXT 10 ROWS ONLY');
     }
 
     public function testBuildInsertWithMergeDataReturnsMergeStatement(): void
@@ -86,8 +83,13 @@ final class MssqlSqlBuilderTest extends TestCase
 
         $sql = $qb->build(true);
 
-        self::assertStringContainsString('MERGE INTO', $sql);
-        self::assertStringNotContainsString('INSERT INTO', $sql);
+        Assert::same(
+            $sql,
+            'MERGE INTO [users] AS target USING (VALUES (\'test@example.com\', \'Test\')) AS source '
+                . '([email], [name]) ON target.[email] = source.[email] WHEN MATCHED THEN UPDATE SET '
+                . '[name] = \'Updated\' WHEN NOT MATCHED THEN INSERT ([email], [name]) VALUES '
+                . '(source.[email], source.[name]);'
+        );
     }
 
     public function testBuildInsertWithoutMergeDataUsesStandardInsert(): void
@@ -99,8 +101,7 @@ final class MssqlSqlBuilderTest extends TestCase
 
         $sql = $qb->build(true);
 
-        self::assertStringContainsString('INSERT INTO', $sql);
-        self::assertStringNotContainsString('MERGE INTO', $sql);
+        Assert::same($sql, 'INSERT INTO [users] ([name]) VALUES (\'Test\')');
     }
 
     public function testBuildProcedureWithoutParameters(): void
@@ -110,9 +111,7 @@ final class MssqlSqlBuilderTest extends TestCase
 
         $sql = $qb->build(true);
 
-        self::assertStringContainsString('EXEC', $sql);
-        self::assertStringContainsString('get_all_users', $sql);
-        self::assertStringNotContainsString('()', $sql);
+        Assert::same($sql, 'EXEC [get_all_users]');
     }
 
     public function testBuildProcedureWithParameters(): void
@@ -122,10 +121,7 @@ final class MssqlSqlBuilderTest extends TestCase
 
         $sql = $qb->build(true);
 
-        self::assertStringContainsString('EXEC', $sql);
-        self::assertStringContainsString('get_user_by_id', $sql);
-        self::assertStringContainsString('1', $sql);
-        self::assertStringContainsString('active', $sql);
+        Assert::same($sql, 'EXEC [get_user_by_id] 1, \'active\'');
     }
 
     public function testBuildProcedureWithNullParameter(): void
@@ -135,8 +131,7 @@ final class MssqlSqlBuilderTest extends TestCase
 
         $sql = $qb->build(true);
 
-        self::assertStringContainsString('NULL', $sql);
-        self::assertStringContainsString('value', $sql);
+        Assert::same($sql, 'EXEC [test_proc] NULL, \'value\'');
     }
 
     public function testBuildProcedureWithBooleanParameters(): void
@@ -146,16 +141,14 @@ final class MssqlSqlBuilderTest extends TestCase
 
         $sql = $qb->build(true);
 
-        self::assertStringContainsString('1', $sql);
-        self::assertStringContainsString('0', $sql);
+        Assert::same($sql, 'EXEC [test_proc] 1, 0');
     }
 
     public function testBuildProcedureWithEmptyProcedureNameThrowsException(): void
     {
         $qb = $this->getQueryBuilder();
 
-        $this->expectException(InvalidIdentifierException::class);
-        $this->expectExceptionMessage('Empty table name is not allowed');
+        Expect::exception(InvalidIdentifierException::class)->withMessageContaining('Empty table name is not allowed');
 
         $qb->procedure('');
     }

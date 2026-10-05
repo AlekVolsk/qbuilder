@@ -12,9 +12,12 @@ namespace QBuilder\Exceptions;
  * - Missing UPDATE data
  * - Missing conflict target
  * - Missing base/recursive/final query in CTE
+ *
+ * @api
  */
 class MissingRequirementException extends QBuilderException
 {
+    // phpcs:ignore Generic.CodeAnalysis.UselessOverridingMethod -- overrides default message and code
     public function __construct(
         string $message = 'Required element is missing',
         int $code = 500,

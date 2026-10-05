@@ -14,6 +14,8 @@ QueryBuilder поддерживает альтернативный синтак�
 ### Простое условие
 
 ```php
+use QBuilder\Condition\ConditionBuilder;
+
 // Стандартный синтаксис
 $qb->where()->eq('status', 'active')->end();
 
@@ -24,6 +26,9 @@ $qb->where(static fn (ConditionBuilder $q): ConditionBuilder => $q->eq('status',
 ### Несколько условий
 
 ```php
+use QBuilder\Condition\ConditionBuilder;
+use QBuilder\QbConsts;
+
 // Стандартный синтаксис
 $qb->where()
     ->eq('status', 'active')
@@ -42,6 +47,8 @@ $qb->where(static fn (ConditionBuilder $q): ConditionBuilder =>
 ### Группы условий
 
 ```php
+use QBuilder\Condition\ConditionBuilder;
+
 // Стандартный синтаксис
 $qb->where()
     ->eq('country', 'US')
@@ -88,6 +95,8 @@ $qb->where(function($q) {
 Альтернативный синтаксис также работает с `having()`:
 
 ```php
+use QBuilder\Condition\ConditionBuilder;
+
 // Стандартный синтаксис
 $qb->having()
     ->gt('COUNT(*)', 5)
@@ -101,6 +110,8 @@ $qb->having(static fn (ConditionBuilder $q): ConditionBuilder => $q->gt('COUNT(*
 ## Сложный пример
 
 ```php
+use QBuilder\Condition\ConditionBy;
+
 // Альтернативный синтаксис для сложного запроса
 $qb->select('*')
     ->from('users')

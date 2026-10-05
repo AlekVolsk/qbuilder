@@ -4,18 +4,18 @@ declare(strict_types=1);
 
 namespace QBuilder\Tests;
 
-use PHPUnit\Framework\TestCase;
 use QBuilder\Condition\ConditionJoin;
 use QBuilder\Condition\Field;
 use QBuilder\QbConsts;
 use QBuilder\QueryBuilder;
+use Testo\Assert;
+use Testo\Test;
 
 /**
  * @internal
- *
- * @coversNothing
  */
-final class ConditionAdvancedTest extends TestCase
+#[Test]
+final class ConditionAdvancedTest
 {
     public function testNotBetween(): void
     {
@@ -28,7 +28,7 @@ final class ConditionAdvancedTest extends TestCase
             ->build(true)
         ;
 
-        self::assertSame('SELECT * FROM `users` WHERE (`age` NOT BETWEEN 18 AND 65)', $sql);
+        Assert::same($sql, 'SELECT * FROM `users` WHERE (`age` NOT BETWEEN 18 AND 65)');
     }
 
     public function testNotBetweenWithFieldObject(): void
@@ -42,7 +42,7 @@ final class ConditionAdvancedTest extends TestCase
             ->build(true)
         ;
 
-        self::assertSame('SELECT `u`.* FROM `users` AS `u` WHERE (`u`.`age` NOT BETWEEN 18 AND 65)', $sql);
+        Assert::same($sql, 'SELECT `u`.* FROM `users` AS `u` WHERE (`u`.`age` NOT BETWEEN 18 AND 65)');
     }
 
     public function testRaw(): void
@@ -56,7 +56,7 @@ final class ConditionAdvancedTest extends TestCase
             ->build(true)
         ;
 
-        self::assertSame('SELECT * FROM `users` WHERE (1 = 1)', $sql);
+        Assert::same($sql, 'SELECT * FROM `users` WHERE (1 = 1)');
     }
 
     public function testRawWithMultipleConditions(): void
@@ -72,8 +72,11 @@ final class ConditionAdvancedTest extends TestCase
             ->build(true)
         ;
 
-        self::assertStringContainsString('EXISTS', $sql);
-        self::assertStringContainsString('orders', $sql);
+        Assert::same(
+            $sql,
+            'SELECT * FROM `users` WHERE (`status` = \'active\') AND (EXISTS (SELECT 1 FROM orders '
+                . 'WHERE orders.user_id = users.id))'
+        );
     }
 
     public function testBetweenWithFieldObject(): void
@@ -87,7 +90,7 @@ final class ConditionAdvancedTest extends TestCase
             ->build(true)
         ;
 
-        self::assertSame('SELECT `u`.* FROM `users` AS `u` WHERE (`u`.`age` BETWEEN 18 AND 65)', $sql);
+        Assert::same($sql, 'SELECT `u`.* FROM `users` AS `u` WHERE (`u`.`age` BETWEEN 18 AND 65)');
     }
 
     public function testBetweenWithStringValues(): void
@@ -101,9 +104,7 @@ final class ConditionAdvancedTest extends TestCase
             ->build(true)
         ;
 
-        self::assertStringContainsString('BETWEEN', $sql);
-        self::assertStringContainsString('2020-01-01', $sql);
-        self::assertStringContainsString('2024-12-31', $sql);
+        Assert::same($sql, 'SELECT * FROM `users` WHERE (`created_at` BETWEEN \'2020-01-01\' AND \'2024-12-31\')');
     }
 
     public function testNotBetweenWithStringValues(): void
@@ -117,9 +118,7 @@ final class ConditionAdvancedTest extends TestCase
             ->build(true)
         ;
 
-        self::assertStringContainsString('NOT BETWEEN', $sql);
-        self::assertStringContainsString('2020-01-01', $sql);
-        self::assertStringContainsString('2024-12-31', $sql);
+        Assert::same($sql, 'SELECT * FROM `users` WHERE (`created_at` NOT BETWEEN \'2020-01-01\' AND \'2024-12-31\')');
     }
 
     public function testInWithEmptyArrayReturnsFalseCondition(): void
@@ -133,7 +132,7 @@ final class ConditionAdvancedTest extends TestCase
             ->build(true)
         ;
 
-        self::assertStringContainsString('1 = 0', $sql);
+        Assert::same($sql, 'SELECT * FROM `users` WHERE (1 = 0)');
     }
 
     public function testNotInWithEmptyArrayReturnsTrueCondition(): void
@@ -147,7 +146,7 @@ final class ConditionAdvancedTest extends TestCase
             ->build(true)
         ;
 
-        self::assertStringContainsString('1 = 1', $sql);
+        Assert::same($sql, 'SELECT * FROM `users` WHERE (1 = 1)');
     }
 
     public function testInWithCommaSeparatedString(): void
@@ -161,10 +160,7 @@ final class ConditionAdvancedTest extends TestCase
             ->build(true)
         ;
 
-        self::assertStringContainsString('IN', $sql);
-        self::assertStringContainsString('active', $sql);
-        self::assertStringContainsString('pending', $sql);
-        self::assertStringContainsString('verified', $sql);
+        Assert::same($sql, 'SELECT * FROM `users` WHERE (`status` IN (\'active\', \'pending\', \'verified\'))');
     }
 
     public function testNotInWithCommaSeparatedString(): void
@@ -178,9 +174,7 @@ final class ConditionAdvancedTest extends TestCase
             ->build(true)
         ;
 
-        self::assertStringContainsString('NOT IN', $sql);
-        self::assertStringContainsString('banned', $sql);
-        self::assertStringContainsString('deleted', $sql);
+        Assert::same($sql, 'SELECT * FROM `users` WHERE (`status` NOT IN (\'banned\', \'deleted\'))');
     }
 
     public function testLikeWithLeftBoundary(): void
@@ -194,9 +188,7 @@ final class ConditionAdvancedTest extends TestCase
             ->build(true)
         ;
 
-        self::assertStringContainsString('LIKE', $sql);
-        self::assertStringContainsString('%example.com', $sql);
-        self::assertStringNotContainsString('example.com%', $sql);
+        Assert::same($sql, 'SELECT * FROM `users` WHERE (`email` LIKE \'%example.com\')');
     }
 
     public function testLikeWithRightBoundary(): void
@@ -210,9 +202,7 @@ final class ConditionAdvancedTest extends TestCase
             ->build(true)
         ;
 
-        self::assertStringContainsString('LIKE', $sql);
-        self::assertStringContainsString('John%', $sql);
-        self::assertStringNotContainsString('%John', $sql);
+        Assert::same($sql, 'SELECT * FROM `users` WHERE (`name` LIKE \'John%\')');
     }
 
     public function testNotLikeWithFullBoundary(): void
@@ -226,8 +216,7 @@ final class ConditionAdvancedTest extends TestCase
             ->build(true)
         ;
 
-        self::assertStringContainsString('NOT LIKE', $sql);
-        self::assertStringContainsString('%Admin%', $sql);
+        Assert::same($sql, 'SELECT * FROM `users` WHERE (`name` NOT LIKE \'%Admin%\')');
     }
 
     public function testNotLikeWithLeftBoundary(): void
@@ -241,8 +230,7 @@ final class ConditionAdvancedTest extends TestCase
             ->build(true)
         ;
 
-        self::assertStringContainsString('NOT LIKE', $sql);
-        self::assertStringContainsString('%example.com', $sql);
+        Assert::same($sql, 'SELECT * FROM `users` WHERE (`email` NOT LIKE \'%example.com\')');
     }
 
     public function testNotLikeWithRightBoundary(): void
@@ -256,8 +244,7 @@ final class ConditionAdvancedTest extends TestCase
             ->build(true)
         ;
 
-        self::assertStringContainsString('NOT LIKE', $sql);
-        self::assertStringContainsString('John%', $sql);
+        Assert::same($sql, 'SELECT * FROM `users` WHERE (`name` NOT LIKE \'John%\')');
     }
 
     public function testHasConditionsReturnsCorrectValue(): void
@@ -265,11 +252,11 @@ final class ConditionAdvancedTest extends TestCase
         $qb = new QueryBuilder();
         $where = $qb->where();
 
-        self::assertFalse($where->hasConditions());
+        Assert::false($where->hasConditions());
 
         $where->eq('status', 'active');
 
-        self::assertTrue($where->hasConditions());
+        Assert::true($where->hasConditions());
     }
 
     public function testResetClearsConditions(): void
@@ -280,12 +267,12 @@ final class ConditionAdvancedTest extends TestCase
             ->gt('age', 18)
         ;
 
-        self::assertTrue($where->hasConditions());
+        Assert::true($where->hasConditions());
 
         $where->reset();
 
-        self::assertFalse($where->hasConditions());
-        self::assertSame('', $where->build());
+        Assert::false($where->hasConditions());
+        Assert::same($where->build(), '');
     }
 
     public function testBuildReturnsEmptyStringForEmptyConditions(): void
@@ -293,7 +280,7 @@ final class ConditionAdvancedTest extends TestCase
         $qb = new QueryBuilder();
         $where = $qb->where();
 
-        self::assertSame('', $where->build());
+        Assert::same($where->build(), '');
     }
 
     public function testBetweenWithNumericValues(): void
@@ -307,9 +294,7 @@ final class ConditionAdvancedTest extends TestCase
             ->build(true)
         ;
 
-        self::assertStringContainsString('BETWEEN', $sql);
-        self::assertStringContainsString('10.5', $sql);
-        self::assertStringContainsString('99.99', $sql);
+        Assert::same($sql, 'SELECT * FROM `products` WHERE (`price` BETWEEN 10.5 AND 99.99)');
     }
 
     public function testNotBetweenWithNumericValues(): void
@@ -323,9 +308,7 @@ final class ConditionAdvancedTest extends TestCase
             ->build(true)
         ;
 
-        self::assertStringContainsString('NOT BETWEEN', $sql);
-        self::assertStringContainsString('10.5', $sql);
-        self::assertStringContainsString('99.99', $sql);
+        Assert::same($sql, 'SELECT * FROM `products` WHERE (`price` NOT BETWEEN 10.5 AND 99.99)');
     }
 
     public function testInKeepsEmptyStringArrayElements(): void
@@ -338,7 +321,7 @@ final class ConditionAdvancedTest extends TestCase
             ->build(true)
         ;
 
-        self::assertSame("SELECT * FROM `users` WHERE (`status` IN ('active', '', 'pending'))", $sql);
+        Assert::same($sql, "SELECT * FROM `users` WHERE (`status` IN ('active', '', 'pending'))");
     }
 
     public function testNotInKeepsEmptyStringArrayElements(): void
@@ -351,7 +334,7 @@ final class ConditionAdvancedTest extends TestCase
             ->build(true)
         ;
 
-        self::assertSame("SELECT * FROM `users` WHERE (`status` NOT IN (''))", $sql);
+        Assert::same($sql, "SELECT * FROM `users` WHERE (`status` NOT IN (''))");
     }
 
     public function testInDropsEmptyElementsOfCommaSeparatedString(): void
@@ -364,7 +347,7 @@ final class ConditionAdvancedTest extends TestCase
             ->build(true)
         ;
 
-        self::assertSame("SELECT * FROM `users` WHERE (`status` IN ('active', 'pending'))", $sql);
+        Assert::same($sql, "SELECT * FROM `users` WHERE (`status` IN ('active', 'pending'))");
     }
 
     public function testNotInWithOnlyEmptyCommaSeparatedStringIsAlwaysTrue(): void
@@ -377,7 +360,7 @@ final class ConditionAdvancedTest extends TestCase
             ->build(true)
         ;
 
-        self::assertSame('SELECT * FROM `users` WHERE (1 = 1)', $sql);
+        Assert::same($sql, 'SELECT * FROM `users` WHERE (1 = 1)');
     }
 
     public function testInSameOutputForWhereHavingAndJoin(): void
@@ -392,9 +375,12 @@ final class ConditionAdvancedTest extends TestCase
             ->build(true)
         ;
 
-        self::assertStringContainsString("`type` IN ('0012', 7, NULL)", $sql);
-        self::assertStringContainsString("`code` IN ('0012', 7, NULL)", $sql);
-        self::assertStringContainsString("`grp` IN ('0012', 7, NULL)", $sql);
+        Assert::same(
+            $sql,
+            'SELECT `u`.* FROM `users` AS `u` LEFT JOIN `orders` AS `o` ON (`o`.`user_id` = '
+                . '`u`.`id`) AND (`o`.`type` IN (\'0012\', 7, NULL)) WHERE (`code` IN (\'0012\', 7, NULL)) '
+                . 'HAVING (`grp` IN (\'0012\', 7, NULL))'
+        );
     }
 
     public function testIsNullWithFieldObject(): void
@@ -408,7 +394,7 @@ final class ConditionAdvancedTest extends TestCase
             ->build(true)
         ;
 
-        self::assertSame('SELECT `u`.* FROM `users` AS `u` WHERE (`u`.`deleted_at` IS NULL)', $sql);
+        Assert::same($sql, 'SELECT `u`.* FROM `users` AS `u` WHERE (`u`.`deleted_at` IS NULL)');
     }
 
     public function testIsNotNullWithFieldObject(): void
@@ -422,7 +408,7 @@ final class ConditionAdvancedTest extends TestCase
             ->build(true)
         ;
 
-        self::assertSame('SELECT `u`.* FROM `users` AS `u` WHERE (`u`.`email` IS NOT NULL)', $sql);
+        Assert::same($sql, 'SELECT `u`.* FROM `users` AS `u` WHERE (`u`.`email` IS NOT NULL)');
     }
 
     public function testIsNullWithStringField(): void
@@ -436,7 +422,7 @@ final class ConditionAdvancedTest extends TestCase
             ->build(true)
         ;
 
-        self::assertSame('SELECT * FROM `users` WHERE (`deleted_at` IS NULL)', $sql);
+        Assert::same($sql, 'SELECT * FROM `users` WHERE (`deleted_at` IS NULL)');
     }
 
     public function testIsNotNullWithStringField(): void
@@ -450,7 +436,7 @@ final class ConditionAdvancedTest extends TestCase
             ->build(true)
         ;
 
-        self::assertSame('SELECT * FROM `users` WHERE (`email` IS NOT NULL)', $sql);
+        Assert::same($sql, 'SELECT * FROM `users` WHERE (`email` IS NOT NULL)');
     }
 
     public function testIsNullAndIsNotNullCombined(): void
@@ -466,8 +452,7 @@ final class ConditionAdvancedTest extends TestCase
             ->build(true)
         ;
 
-        self::assertStringContainsString('`deleted_at` IS NULL', $sql);
-        self::assertStringContainsString('`email` IS NOT NULL', $sql);
+        Assert::same($sql, 'SELECT * FROM `users` WHERE (`deleted_at` IS NULL) AND (`email` IS NOT NULL)');
     }
 
     public function testEqWithFieldObject(): void
@@ -481,7 +466,7 @@ final class ConditionAdvancedTest extends TestCase
             ->build(true)
         ;
 
-        self::assertSame('SELECT `u`.* FROM `users` AS `u` WHERE (`u`.`status` = \'active\')', $sql);
+        Assert::same($sql, 'SELECT `u`.* FROM `users` AS `u` WHERE (`u`.`status` = \'active\')');
     }
 
     public function testNeqWithFieldObject(): void
@@ -495,7 +480,7 @@ final class ConditionAdvancedTest extends TestCase
             ->build(true)
         ;
 
-        self::assertSame('SELECT `u`.* FROM `users` AS `u` WHERE (`u`.`status` != \'inactive\')', $sql);
+        Assert::same($sql, 'SELECT `u`.* FROM `users` AS `u` WHERE (`u`.`status` != \'inactive\')');
     }
 
     public function testGtWithFieldObject(): void
@@ -509,7 +494,7 @@ final class ConditionAdvancedTest extends TestCase
             ->build(true)
         ;
 
-        self::assertSame('SELECT `p`.* FROM `products` AS `p` WHERE (`p`.`price` > 100)', $sql);
+        Assert::same($sql, 'SELECT `p`.* FROM `products` AS `p` WHERE (`p`.`price` > 100)');
     }
 
     public function testGteWithFieldObject(): void
@@ -523,7 +508,7 @@ final class ConditionAdvancedTest extends TestCase
             ->build(true)
         ;
 
-        self::assertSame('SELECT `p`.* FROM `products` AS `p` WHERE (`p`.`price` >= 100)', $sql);
+        Assert::same($sql, 'SELECT `p`.* FROM `products` AS `p` WHERE (`p`.`price` >= 100)');
     }
 
     public function testLtWithFieldObject(): void
@@ -537,7 +522,7 @@ final class ConditionAdvancedTest extends TestCase
             ->build(true)
         ;
 
-        self::assertSame('SELECT `p`.* FROM `products` AS `p` WHERE (`p`.`price` < 1000)', $sql);
+        Assert::same($sql, 'SELECT `p`.* FROM `products` AS `p` WHERE (`p`.`price` < 1000)');
     }
 
     public function testLteWithFieldObject(): void
@@ -551,7 +536,7 @@ final class ConditionAdvancedTest extends TestCase
             ->build(true)
         ;
 
-        self::assertSame('SELECT `p`.* FROM `products` AS `p` WHERE (`p`.`price` <= 1000)', $sql);
+        Assert::same($sql, 'SELECT `p`.* FROM `products` AS `p` WHERE (`p`.`price` <= 1000)');
     }
 
     public function testLikeWithFieldObject(): void
@@ -565,8 +550,7 @@ final class ConditionAdvancedTest extends TestCase
             ->build(true)
         ;
 
-        self::assertStringContainsString('`u`.`name` LIKE', $sql);
-        self::assertStringContainsString('John%', $sql);
+        Assert::same($sql, 'SELECT `u`.* FROM `users` AS `u` WHERE (`u`.`name` LIKE \'John%\')');
     }
 
     public function testNotLikeWithFieldObject(): void
@@ -580,7 +564,6 @@ final class ConditionAdvancedTest extends TestCase
             ->build(true)
         ;
 
-        self::assertStringContainsString('`u`.`email` NOT LIKE', $sql);
-        self::assertStringContainsString('%test%', $sql);
+        Assert::same($sql, 'SELECT `u`.* FROM `users` AS `u` WHERE (`u`.`email` NOT LIKE \'%test%\')');
     }
 }

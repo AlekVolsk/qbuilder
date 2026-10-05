@@ -6,6 +6,7 @@ namespace QBuilder\Builder;
 
 use QBuilder\Drivers\DriverInterface;
 use QBuilder\Exceptions\InvalidIdentifierException;
+use QBuilder\Exceptions\InvalidQueryException;
 use QBuilder\QueryBuilder;
 use QBuilder\Services\SqlSecurity;
 
@@ -18,10 +19,41 @@ use QBuilder\Services\SqlSecurity;
  * - SQLite: ON CONFLICT ... DO UPDATE
  * - MSSQL: MERGE
  * - Oracle: MERGE
+ *
+ * @internal
  */
 abstract class AbstractConflictBuilder implements ConflictBuilderInterface
 {
-    /** @var array<int,string> */
+    /**
+     * Keywords that let an SQL fragment read other data or leave its assignment.
+     */
+    protected const array FRAGMENT_FORBIDDEN_KEYWORDS = [
+        'SELECT',
+        'UNION',
+        'INSERT',
+        'UPDATE',
+        'DELETE',
+        'DROP',
+        'MERGE',
+        'EXEC',
+        'EXECUTE',
+        'CALL',
+        'INTO',
+        'WHERE',
+        'RETURNING',
+        'OUTPUT',
+        'CASE',
+        'WHEN',
+        'THEN',
+        'ELSE',
+        'END',
+    ];
+
+    /**
+     * Assignments; a closure is resolved on build, when the INSERT table is known.
+     *
+     * @var list<\Closure(): string|string>
+     */
     protected array $updates = [];
 
     /** @var array<string> */
@@ -36,7 +68,7 @@ abstract class AbstractConflictBuilder implements ConflictBuilderInterface
     /**
      * Specify conflict target fields.
      *
-     * @param array<string> $fields Fields for matching
+     * @param array<int,string> $fields Fields for matching
      */
     public function conflictTarget(array $fields): self
     {
@@ -72,7 +104,7 @@ abstract class AbstractConflictBuilder implements ConflictBuilderInterface
     {
         $field = SqlSecurity::validateFieldName($field);
 
-        $this->updates[] = $this->quoteField($field).' = '.$this->getDriver()->formatValue($value);
+        $this->updates[] = $this->quoteField($field) . ' = ' . $this->getDriver()->formatValue($value);
 
         return $this;
     }
@@ -80,17 +112,20 @@ abstract class AbstractConflictBuilder implements ConflictBuilderInterface
     /**
      * Increment field.
      *
-     * @param string  $field Field name
-     * @param numeric $value Value to add
+     * @param string                   $field Field name
+     * @param float|int|numeric-string $value Value to add
      *
      * @throws InvalidIdentifierException
+     * @throws InvalidQueryException      If the value is not a finite number
      */
     public function increment(string $field, float|int|string $value = 1): self
     {
         $field = SqlSecurity::validateFieldName($field);
         $quotedField = $this->quoteField($field);
 
-        $this->updates[] = $quotedField.' = '.$quotedField.' + '.$value;
+        $operand = self::formatNumericOperand($value);
+        $this->updates[] = fn (): string => $quotedField . ' = '
+            . $this->currentValueReference($quotedField) . ' + ' . $operand;
 
         return $this;
     }
@@ -98,17 +133,20 @@ abstract class AbstractConflictBuilder implements ConflictBuilderInterface
     /**
      * Decrement field.
      *
-     * @param string  $field Field name
-     * @param numeric $value Value to subtract
+     * @param string                   $field Field name
+     * @param float|int|numeric-string $value Value to subtract
      *
      * @throws InvalidIdentifierException
+     * @throws InvalidQueryException      If the value is not a finite number
      */
     public function decrement(string $field, float|int|string $value = 1): self
     {
         $field = SqlSecurity::validateFieldName($field);
         $quotedField = $this->quoteField($field);
 
-        $this->updates[] = $quotedField.' = '.$quotedField.' - '.$value;
+        $operand = self::formatNumericOperand($value);
+        $this->updates[] = fn (): string => $quotedField . ' = '
+            . $this->currentValueReference($quotedField) . ' - ' . $operand;
 
         return $this;
     }
@@ -124,7 +162,7 @@ abstract class AbstractConflictBuilder implements ConflictBuilderInterface
     {
         $field = SqlSecurity::validateFieldName($field);
 
-        $this->updates[] = $this->quoteField($field).' = NULL';
+        $this->updates[] = $this->quoteField($field) . ' = NULL';
 
         return $this;
     }
@@ -140,8 +178,9 @@ abstract class AbstractConflictBuilder implements ConflictBuilderInterface
     public function sqlFunction(string $field, string $functionCall): self
     {
         $field = SqlSecurity::validateFieldName($field);
+        $this->validateFragment($functionCall, self::FRAGMENT_FORBIDDEN_KEYWORDS, 'SQL function');
 
-        $this->updates[] = $this->quoteField($field).' = '.$functionCall;
+        $this->updates[] = $this->quoteField($field) . ' = ' . $functionCall;
 
         return $this;
     }
@@ -188,6 +227,47 @@ abstract class AbstractConflictBuilder implements ConflictBuilderInterface
     }
 
     /**
+     * Validate an SQL fragment against the driver identifier quotes.
+     *
+     * @param list<string> $forbiddenKeywords
+     *
+     * @throws InvalidIdentifierException
+     */
+    protected function validateFragment(string $fragment, array $forbiddenKeywords, string $type): void
+    {
+        $driver = $this->getDriver();
+
+        SqlSecurity::validateSqlFragment(
+            $fragment,
+            $driver->getIdentifierQuote(),
+            $driver->getIdentifierCloseQuote(),
+            $forbiddenKeywords,
+            $type
+        );
+    }
+
+    /**
+     * Reference to the current value of a field in the conflicting row.
+     *
+     * @param string $quotedField Quoted field name
+     */
+    protected function currentValueReference(string $quotedField): string
+    {
+        return $quotedField;
+    }
+
+    /**
+     * Assignments joined for the UPDATE part.
+     */
+    protected function buildUpdates(): string
+    {
+        return implode(', ', array_map(
+            static fn (\Closure|string $update): string => $update instanceof \Closure ? $update() : $update,
+            $this->updates
+        ));
+    }
+
+    /**
      * Quote field via driver.
      *
      * @param string $field Field name
@@ -195,5 +275,27 @@ abstract class AbstractConflictBuilder implements ConflictBuilderInterface
     protected function quoteField(string $field): string
     {
         return $this->getDriver()->quoteName($field);
+    }
+
+    /**
+     * Format a numeric operand of increment/decrement.
+     *
+     * @throws InvalidQueryException If the value is not a finite number
+     */
+    private static function formatNumericOperand(float|int|string $value): string
+    {
+        if (\is_string($value)) {
+            if (! is_numeric($value)) {
+                throw new InvalidQueryException("Increment/decrement value must be numeric, '{$value}' given");
+            }
+
+            return trim($value);
+        }
+
+        if (\is_float($value) && ! is_finite($value)) {
+            throw new InvalidQueryException('Increment/decrement value must be a finite number');
+        }
+
+        return (string) $value;
     }
 }

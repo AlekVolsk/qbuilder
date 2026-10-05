@@ -35,6 +35,10 @@ A string with leading zeros (tax IDs, codes, SKUs) is kept intact. A number that
 
 `INF` and `NAN` have no SQL literal — `formatValue()` throws `InvalidQueryException`.
 
+**`bool` follows the PHP type, not the column type.** PostgreSQL gets `TRUE` / `FALSE`, which fits only a `boolean` column: an `integer` flag column rejects it (`column "flag" is of type integer but expression is of type boolean`). For integer flags pass `1` / `0` as `int`. MySQL and SQLite store `1` / `0` either way.
+
+**NUL bytes.** PostgreSQL and SQLite cannot carry a NUL byte (`"\0"`) in SQL text — the statement ends at it — so a string with NUL throws `InvalidQueryException` on these drivers. MySQL stores it as is.
+
 ```php
 $qb->insert('org')
     ->insertRow(['inn' => '0123456789', 'qty' => 5, 'active' => false])
@@ -62,6 +66,24 @@ $qb->where()
 ```php
 $userInput = $_GET['status'];
 $sql = "SELECT * FROM users WHERE status = '" . $userInput . "'";
+```
+
+## SQL Fragments in Conflict Handlers
+
+`increment()` and `decrement()` accept only numbers: a non-numeric string, `INF` or `NAN` throws `InvalidQueryException`.
+
+`expression()`, `caseExpression()` and `sqlFunction()` take SQL as is, so pass them SQL written in code, not user input — for user values use `set()`. Each fragment must still stay a single expression on the right side of its assignment, otherwise `InvalidIdentifierException` is thrown:
+
+- string literals (`'...'`, `"..."`) and identifiers in the driver quotes are allowed, doubled quotes inside them are escapes;
+- backslashes, control characters, other quote characters, `$`, `@`, `{`, `}`, `#`, `;`, `--`, `/* */` are rejected;
+- parentheses must be balanced, a comma is allowed only inside parentheses;
+- `SELECT`, `UNION`, `INSERT`, `UPDATE`, `DELETE`, `DROP`, `MERGE`, `EXEC`, `EXECUTE`, `CALL`, `INTO`, `WHERE`, `RETURNING`, `OUTPUT`, `CASE`, `END` outside literals are rejected; `WHEN`, `THEN`, `ELSE` are allowed only in `caseExpression()` conditions. Quote a column whose name is one of these words.
+
+```php
+$cb->sqlFunction('label', "CONCAT(first_name, ', ', last_name)"); // ✅ OK
+$cb->sqlFunction('note', 'NOW(), role = 1');                       // ❌ comma outside parentheses
+$cb->expression('note', '(SELECT password FROM users LIMIT 1)');   // ❌ SELECT
+$cb->increment('visits', '1; DROP TABLE users');                   // ❌ not a number
 ```
 
 ## Identifier Validation

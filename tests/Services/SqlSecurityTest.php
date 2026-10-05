@@ -4,32 +4,34 @@ declare(strict_types=1);
 
 namespace QBuilder\Tests;
 
-use PHPUnit\Framework\Attributes\DataProvider;
-use PHPUnit\Framework\TestCase;
 use QBuilder\Exceptions\InvalidIdentifierException;
+use QBuilder\Exceptions\UnsupportedFeatureException;
 use QBuilder\QbConsts;
 use QBuilder\Services\SqlSecurity;
+use Testo\Assert;
+use Testo\Assert\ExpectException;
+use Testo\Data\DataProvider;
+use Testo\Expect;
+use Testo\Test;
 
 /**
  * @internal
- *
- * @coversNothing
  */
-final class SqlSecurityTest extends TestCase
+#[Test]
+final class SqlSecurityTest
 {
     public function testValidateIdentifierValid(): void
     {
-        self::assertSame('valid_name', SqlSecurity::validateIdentifier('valid_name'));
-        self::assertSame('table123', SqlSecurity::validateIdentifier('table123'));
-        self::assertSame('_underscore', SqlSecurity::validateIdentifier('_underscore'));
-        self::assertSame('CamelCase', SqlSecurity::validateIdentifier('CamelCase'));
+        Assert::same(SqlSecurity::validateIdentifier('valid_name'), 'valid_name');
+        Assert::same(SqlSecurity::validateIdentifier('table123'), 'table123');
+        Assert::same(SqlSecurity::validateIdentifier('_underscore'), '_underscore');
+        Assert::same(SqlSecurity::validateIdentifier('CamelCase'), 'CamelCase');
     }
 
     #[DataProvider('provideValidateIdentifierInvalidThrowsExceptionCases')]
     public function testValidateIdentifierInvalidThrowsException(string $invalidIdentifier): void
     {
-        $this->expectException(InvalidIdentifierException::class);
-        $this->expectExceptionMessage('Invalid identifier');
+        Expect::exception(InvalidIdentifierException::class)->withMessageContaining('Invalid identifier');
 
         SqlSecurity::validateIdentifier($invalidIdentifier);
     }
@@ -53,25 +55,23 @@ final class SqlSecurityTest extends TestCase
 
     public function testValidateIdentifierEmpty(): void
     {
-        $this->expectException(InvalidIdentifierException::class);
-        $this->expectExceptionMessage('Empty identifier is not allowed');
+        Expect::exception(InvalidIdentifierException::class)->withMessageContaining('Empty identifier is not allowed');
 
         SqlSecurity::validateIdentifier('');
     }
 
     public function testValidateFieldNameValid(): void
     {
-        self::assertSame('field_name', SqlSecurity::validateFieldName('field_name'));
-        self::assertSame('*', SqlSecurity::validateFieldName('*'));
-        self::assertSame('table.field', SqlSecurity::validateFieldName('table.field'));
-        self::assertSame('field123', SqlSecurity::validateFieldName('field123'));
+        Assert::same(SqlSecurity::validateFieldName('field_name'), 'field_name');
+        Assert::same(SqlSecurity::validateFieldName('*'), '*');
+        Assert::same(SqlSecurity::validateFieldName('table.field'), 'table.field');
+        Assert::same(SqlSecurity::validateFieldName('field123'), 'field123');
     }
 
     #[DataProvider('provideValidateFieldNameInvalidThrowsExceptionCases')]
     public function testValidateFieldNameInvalidThrowsException(string $invalidField): void
     {
-        $this->expectException(InvalidIdentifierException::class);
-        $this->expectExceptionMessage('Invalid field name');
+        Expect::exception(InvalidIdentifierException::class)->withMessageContaining('Invalid field name');
 
         SqlSecurity::validateFieldName($invalidField);
     }
@@ -90,17 +90,16 @@ final class SqlSecurityTest extends TestCase
 
     public function testValidateAliasNameValid(): void
     {
-        self::assertSame('alias_name', SqlSecurity::validateAliasName('alias_name'));
-        self::assertSame('a', SqlSecurity::validateAliasName('a'));
-        self::assertSame('alias123', SqlSecurity::validateAliasName('alias123'));
-        self::assertSame('CamelCase', SqlSecurity::validateAliasName('CamelCase'));
+        Assert::same(SqlSecurity::validateAliasName('alias_name'), 'alias_name');
+        Assert::same(SqlSecurity::validateAliasName('a'), 'a');
+        Assert::same(SqlSecurity::validateAliasName('alias123'), 'alias123');
+        Assert::same(SqlSecurity::validateAliasName('CamelCase'), 'CamelCase');
     }
 
     #[DataProvider('provideValidateAliasNameInvalidThrowsExceptionCases')]
     public function testValidateAliasNameInvalidThrowsException(string $invalidAlias): void
     {
-        $this->expectException(InvalidIdentifierException::class);
-        $this->expectExceptionMessage('Invalid alias name');
+        Expect::exception(InvalidIdentifierException::class)->withMessageContaining('Invalid alias name');
 
         SqlSecurity::validateAliasName($invalidAlias);
     }
@@ -114,6 +113,14 @@ final class SqlSecurityTest extends TestCase
         yield 'space' => ['alias with space'];
         yield 'semicolon' => ['alias;drop'];
         yield 'single quote' => ["alias'quote"];
+    }
+
+    #[DataProvider('provideValidateOperatorInvalidThrowsExceptionCases')]
+    public function testValidateOperatorInvalidThrowsException(string $invalidOperator): void
+    {
+        Expect::exception(InvalidIdentifierException::class)->withMessageContaining('Invalid comparison operator');
+
+        SqlSecurity::validateComparisonOperator($invalidOperator);
     }
 
     /**
@@ -133,17 +140,16 @@ final class SqlSecurityTest extends TestCase
 
     public function testValidateOrderDirectionValid(): void
     {
-        self::assertSame('ASC', SqlSecurity::validateOrderDirection('ASC'));
-        self::assertSame('DESC', SqlSecurity::validateOrderDirection('DESC'));
-        self::assertSame('ASC', SqlSecurity::validateOrderDirection('asc'));
-        self::assertSame('DESC', SqlSecurity::validateOrderDirection('desc'));
+        Assert::same(SqlSecurity::validateOrderDirection('ASC'), 'ASC');
+        Assert::same(SqlSecurity::validateOrderDirection('DESC'), 'DESC');
+        Assert::same(SqlSecurity::validateOrderDirection('asc'), 'ASC');
+        Assert::same(SqlSecurity::validateOrderDirection('desc'), 'DESC');
     }
 
     #[DataProvider('provideValidateOrderDirectionInvalidThrowsExceptionCases')]
     public function testValidateOrderDirectionInvalidThrowsException(string $invalidDirection): void
     {
-        $this->expectException(InvalidIdentifierException::class);
-        $this->expectExceptionMessage('Invalid order direction');
+        Expect::exception(InvalidIdentifierException::class)->withMessageContaining('Invalid order direction');
 
         SqlSecurity::validateOrderDirection($invalidDirection);
     }
@@ -161,10 +167,9 @@ final class SqlSecurityTest extends TestCase
     }
 
     #[DataProvider('provideValidateIdentifierSqlInjectionAttemptsCases')]
+    #[ExpectException(InvalidIdentifierException::class)]
     public function testValidateIdentifierSqlInjectionAttempts(string $injection): void
     {
-        $this->expectException(InvalidIdentifierException::class);
-
         SqlSecurity::validateIdentifier($injection);
     }
 
@@ -183,8 +188,9 @@ final class SqlSecurityTest extends TestCase
     #[DataProvider('provideDriverSpecificKeywordsBlockedCases')]
     public function testDriverSpecificKeywordsBlocked(string $driver, string $keyword): void
     {
-        $this->expectException(InvalidIdentifierException::class);
-        $this->expectExceptionMessage("SQL keyword detected for driver '{$driver}'");
+        Expect::exception(InvalidIdentifierException::class)
+            ->withMessageContaining("SQL keyword detected for driver '{$driver}'")
+        ;
 
         SqlSecurity::validateIdentifier($keyword, 'identifier', $driver, false);
     }
@@ -227,8 +233,7 @@ final class SqlSecurityTest extends TestCase
     #[DataProvider('provideCommonKeywordsBlockedWhenNotEscapedCases')]
     public function testCommonKeywordsBlockedWhenNotEscaped(string $driver, string $keyword): void
     {
-        $this->expectException(InvalidIdentifierException::class);
-        $this->expectExceptionMessage('SQL keyword detected');
+        Expect::exception(InvalidIdentifierException::class)->withMessageContaining('SQL keyword detected');
 
         SqlSecurity::validateIdentifier($keyword, 'identifier', $driver, false);
     }
@@ -261,7 +266,7 @@ final class SqlSecurityTest extends TestCase
     {
         $result = SqlSecurity::validateIdentifier($keyword, 'identifier', $driver, true);
 
-        self::assertSame($keyword, $result);
+        Assert::same($result, $keyword);
     }
 
     /**
@@ -291,12 +296,68 @@ final class SqlSecurityTest extends TestCase
     {
         $validName = 'my_table_name';
 
-        self::assertSame($validName, SqlSecurity::validateIdentifier($validName, 'table', QbConsts::DRIVER_MYSQL));
-        self::assertSame($validName, SqlSecurity::validateIdentifier($validName, 'table', QbConsts::DRIVER_PDO_MYSQL));
-        self::assertSame($validName, SqlSecurity::validateIdentifier($validName, 'table', QbConsts::DRIVER_PGSQL));
-        self::assertSame($validName, SqlSecurity::validateIdentifier($validName, 'table', QbConsts::DRIVER_CLICKHOUSE));
-        self::assertSame($validName, SqlSecurity::validateIdentifier($validName, 'table', QbConsts::DRIVER_MSSQL));
-        self::assertSame($validName, SqlSecurity::validateIdentifier($validName, 'table', QbConsts::DRIVER_ORACLE));
-        self::assertSame($validName, SqlSecurity::validateIdentifier($validName, 'table', QbConsts::DRIVER_SQLITE));
+        Assert::same(SqlSecurity::validateIdentifier($validName, 'table', QbConsts::DRIVER_MYSQL), $validName);
+        Assert::same(SqlSecurity::validateIdentifier($validName, 'table', QbConsts::DRIVER_PDO_MYSQL), $validName);
+        Assert::same(SqlSecurity::validateIdentifier($validName, 'table', QbConsts::DRIVER_PGSQL), $validName);
+        Assert::same(SqlSecurity::validateIdentifier($validName, 'table', QbConsts::DRIVER_CLICKHOUSE), $validName);
+        Assert::same(SqlSecurity::validateIdentifier($validName, 'table', QbConsts::DRIVER_MSSQL), $validName);
+        Assert::same(SqlSecurity::validateIdentifier($validName, 'table', QbConsts::DRIVER_ORACLE), $validName);
+        Assert::same(SqlSecurity::validateIdentifier($validName, 'table', QbConsts::DRIVER_SQLITE), $validName);
+    }
+
+    /**
+     * @param non-empty-string $operator
+     */
+    #[DataProvider('provideDialectSpecificOperatorCases')]
+    public function testDialectSpecificComparisonOperatorIsAccepted(string $driver, string $operator): void
+    {
+        Assert::same(SqlSecurity::validateComparisonOperator(strtolower($operator), $driver), $operator);
+    }
+
+    /**
+     * @return iterable<string, array{string, non-empty-string}>
+     */
+    public static function provideDialectSpecificOperatorCases(): iterable
+    {
+        yield 'PostgreSQL ILIKE' => [QbConsts::DRIVER_PGSQL, 'ILIKE'];
+        yield 'ClickHouse GLOBAL IN' => [QbConsts::DRIVER_CLICKHOUSE, 'GLOBAL IN'];
+        yield 'MS SQL !<' => [QbConsts::DRIVER_MSSQL, '!<'];
+        yield 'Oracle IS DISTINCT FROM' => [QbConsts::DRIVER_ORACLE, 'IS DISTINCT FROM'];
+        yield 'SQLite GLOB' => [QbConsts::DRIVER_SQLITE, 'GLOB'];
+    }
+
+    /**
+     * @param \Closure(): mixed $call
+     */
+    #[DataProvider('provideUnknownDriverCases')]
+    public function testUnknownDriverIsRejected(\Closure $call): void
+    {
+        Expect::exception(UnsupportedFeatureException::class)
+            ->withMessageContaining("Unsupported database driver: 'nosql'")
+        ;
+
+        $call();
+    }
+
+    /**
+     * @return iterable<string, array{\Closure(): mixed}>
+     */
+    public static function provideUnknownDriverCases(): iterable
+    {
+        yield 'SQL functions' => [static fn (): array => SqlSecurity::getSqlFunctions('nosql')];
+
+        yield 'dangerous keywords' => [
+            static fn (): string => SqlSecurity::escapeIdentifiersInExpression('a.b', '`', 'nosql'),
+        ];
+
+        yield 'comparison operators' => [static fn (): string => SqlSecurity::validateComparisonOperator('=', 'nosql')];
+    }
+
+    public function testEscapeIdentifiersInExpressionKeepsKeywordsAndNumbers(): void
+    {
+        Assert::same(
+            SqlSecurity::escapeIdentifiersInExpression('SELECT.id + u.id + COUNT(DISTINCT) + MAX(price)', '`'),
+            'SELECT.id + `u`.`id` + COUNT(DISTINCT) + MAX(`price`)'
+        );
     }
 }

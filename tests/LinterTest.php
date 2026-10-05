@@ -4,14 +4,14 @@ declare(strict_types=1);
 
 namespace QBuilder\Tests;
 
-use PHPUnit\Framework\TestCase;
+use Testo\Assert;
+use Testo\Test;
 
 /**
  * @internal
- *
- * @coversNothing
  */
-final class LinterTest extends TestCase
+#[Test]
+final class LinterTest
 {
     public function testNoTabsInFiles(): void
     {
@@ -29,7 +29,7 @@ final class LinterTest extends TestCase
                 if (str_contains($line, "\t")) {
                     $filesWithTabs[] = \sprintf(
                         '%s:%d',
-                        str_replace(__DIR__.'/../', '', (string) $file),
+                        str_replace(__DIR__ . '/../', '', (string) $file),
                         $lineNumber + 1
                     );
                 }
@@ -42,46 +42,7 @@ final class LinterTest extends TestCase
             implode("\n", $filesWithTabs)
         );
 
-        self::assertEmpty($filesWithTabs, $message);
-    }
-
-    public function testNoLineExceeds120Characters(): void
-    {
-        $longLines = [];
-        $phpFiles = $this->getPhpFiles();
-        $maxLength = 120;
-
-        foreach ($phpFiles as $file) {
-            $content = file_get_contents((string) $file);
-            if (false === $content) {
-                continue;
-            }
-
-            $lines = explode("\n", $content);
-            foreach ($lines as $lineNumber => $line) {
-                $lineLength = \strlen($line);
-                if ($lineLength > $maxLength) {
-                    $longLines[] = \sprintf(
-                        '%s:%d (%d characters)',
-                        str_replace(__DIR__.'/../', '', (string) $file),
-                        $lineNumber + 1,
-                        $lineLength
-                    );
-                }
-            }
-        }
-
-        $preview = implode("\n", \array_slice($longLines, 0, 20));
-        $moreInfo = \count($longLines) > 20 ? "\n... and ".(\count($longLines) - 20).' more' : '';
-        $message = \sprintf(
-            "Found %d line(s) exceeding %d characters:\n%s%s",
-            \count($longLines),
-            $maxLength,
-            $preview,
-            $moreInfo
-        );
-
-        self::assertEmpty($longLines, $message);
+        Assert::blank($filesWithTabs, $message);
     }
 
     /**
@@ -90,7 +51,7 @@ final class LinterTest extends TestCase
     private function getPhpFiles(): array
     {
         $files = [];
-        $directories = [__DIR__.'/../src', __DIR__];
+        $directories = [__DIR__ . '/../src', __DIR__];
 
         foreach ($directories as $directory) {
             if (! is_dir($directory)) {

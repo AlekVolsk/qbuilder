@@ -4,18 +4,18 @@ declare(strict_types=1);
 
 namespace QBuilder\Tests;
 
-use PHPUnit\Framework\Attributes\DataProvider;
-use PHPUnit\Framework\TestCase;
 use QBuilder\Condition\ConditionJoin;
 use QBuilder\QbConsts;
 use QBuilder\QueryBuilder;
+use Testo\Assert;
+use Testo\Data\DataProvider;
+use Testo\Test;
 
 /**
  * @internal
- *
- * @coversNothing
  */
-final class JoinConditionQualificationTest extends TestCase
+#[Test]
+final class JoinConditionQualificationTest
 {
     /**
      * @param non-empty-string $expected
@@ -32,7 +32,7 @@ final class JoinConditionQualificationTest extends TestCase
 
         $sql = $qb->select('*')->from('orders', 'o')->innerJoin('users', 'u', $condition)->build(true);
 
-        self::assertStringEndsWith($expected, $sql);
+        Assert::same($sql, $expected);
     }
 
     /**
@@ -42,27 +42,32 @@ final class JoinConditionQualificationTest extends TestCase
     {
         yield 'mysql' => [
             QbConsts::DRIVER_PDO_MYSQL,
-            "ON (`u`.`id` = `o`.`user_id`) AND (`u`.`status` IN ('a')) AND (`u`.`deleted_at` IS NULL) AND (1 = 1)",
+            'SELECT `o`.* FROM `orders` AS `o` INNER JOIN `users` AS `u` ON (`u`.`id` = `o`.`user_id`) '
+                . "AND (`u`.`status` IN ('a')) AND (`u`.`deleted_at` IS NULL) AND (1 = 1)",
         ];
 
         yield 'mssql' => [
             QbConsts::DRIVER_MSSQL,
-            "ON ([u].[id] = [o].[user_id]) AND ([u].[status] IN ('a')) AND ([u].[deleted_at] IS NULL) AND (1 = 1)",
+            'SELECT * FROM [orders] AS [o] INNER JOIN [users] AS [u] ON ([u].[id] = [o].[user_id]) '
+                . "AND ([u].[status] IN ('a')) AND ([u].[deleted_at] IS NULL) AND (1 = 1)",
         ];
 
         yield 'postgresql' => [
             QbConsts::DRIVER_PGSQL,
-            'ON ("u"."id" = "o"."user_id") AND ("u"."status" IN (\'a\')) AND ("u"."deleted_at" IS NULL) AND (1 = 1)',
+            'SELECT * FROM "orders" AS "o" INNER JOIN "users" AS "u" ON ("u"."id" = "o"."user_id") '
+                . 'AND ("u"."status" IN (\'a\')) AND ("u"."deleted_at" IS NULL) AND (1 = 1)',
         ];
 
         yield 'sqlite' => [
             QbConsts::DRIVER_SQLITE,
-            'ON ("u"."id" = "o"."user_id") AND ("u"."status" IN (\'a\')) AND ("u"."deleted_at" IS NULL) AND (1 = 1)',
+            'SELECT * FROM "orders" AS "o" INNER JOIN "users" AS "u" ON ("u"."id" = "o"."user_id") '
+                . 'AND ("u"."status" IN (\'a\')) AND ("u"."deleted_at" IS NULL) AND (1 = 1)',
         ];
 
         yield 'oracle' => [
             QbConsts::DRIVER_ORACLE,
-            'ON ("U"."ID" = "O"."USER_ID") AND ("U"."STATUS" IN (\'a\')) AND ("U"."DELETED_AT" IS NULL) AND (1 = 1)',
+            'SELECT * FROM "ORDERS" "O" INNER JOIN "USERS" "U" ON ("U"."ID" = "O"."USER_ID") '
+                . 'AND ("U"."STATUS" IN (\'a\')) AND ("U"."DELETED_AT" IS NULL) AND (1 = 1)',
         ];
     }
 
@@ -74,7 +79,7 @@ final class JoinConditionQualificationTest extends TestCase
             ->build(true)
         ;
 
-        self::assertSame('SELECT * FROM `orders` LEFT JOIN `users` ON (`users`.`id` = `orders`.`user_id`)', $sql);
+        Assert::same($sql, 'SELECT * FROM `orders` LEFT JOIN `users` ON (`users`.`id` = `orders`.`user_id`)');
     }
 
     public function testStringLiteralsAreNotTouched(): void
@@ -87,9 +92,10 @@ final class JoinConditionQualificationTest extends TestCase
 
         $sql = $qb->select('*')->from('orders', 'o')->innerJoin('users', 'u', $condition)->build(true);
 
-        self::assertStringEndsWith(
-            "AND (`u`.`name` = '(`x` = 1') AND (`u`.`code` = '__RAW__password')",
-            $sql
+        Assert::same(
+            $sql,
+            'SELECT `o`.* FROM `orders` AS `o` INNER JOIN `users` AS `u` ON (`u`.`id` = '
+                . '`o`.`user_id`) AND (`u`.`name` = \'(`x` = 1\') AND (`u`.`code` = \'__RAW__password\')'
         );
     }
 }

@@ -4,64 +4,57 @@ declare(strict_types=1);
 
 namespace QBuilder\Tests;
 
-use PHPUnit\Framework\TestCase;
-use QBuilder\Drivers\DriverFactory;
-use QBuilder\Drivers\Mysql\MysqlOnDuplicateKeyUpdateBuilder;
 use QBuilder\Exceptions\InvalidIdentifierException;
-use QBuilder\QbConsts;
 use QBuilder\QueryBuilder;
+use Testo\Assert;
+use Testo\Expect;
+use Testo\Test;
 
 /**
  * @internal
- *
- * @coversNothing
  */
-final class ExpressionsTraitTest extends TestCase
+#[Test]
+final class ExpressionsTraitTest
 {
     public function testExpressionWithValidExpression(): void
     {
         $qb = new QueryBuilder();
-        $driver = DriverFactory::create(QbConsts::DRIVER_MYSQL);
-        $builder = MysqlOnDuplicateKeyUpdateBuilder::create($qb, $driver);
+        $builder = $qb->conflictBuilder();
 
         $builder->expression('price', 'price * 1.1');
         $result = $builder->build();
 
-        self::assertStringContainsString('`price` = price * 1.1', $result);
+        Assert::same($result, '`price` = price * 1.1');
     }
 
     public function testExpressionWithArithmeticExpression(): void
     {
         $qb = new QueryBuilder();
-        $driver = DriverFactory::create(QbConsts::DRIVER_MYSQL);
-        $builder = MysqlOnDuplicateKeyUpdateBuilder::create($qb, $driver);
+        $builder = $qb->conflictBuilder();
 
         $builder->expression('count', 'count + 1');
         $result = $builder->build();
 
-        self::assertStringContainsString('`count` = count + 1', $result);
+        Assert::same($result, '`count` = count + 1');
     }
 
     public function testExpressionWithParentheses(): void
     {
         $qb = new QueryBuilder();
-        $driver = DriverFactory::create(QbConsts::DRIVER_MYSQL);
-        $builder = MysqlOnDuplicateKeyUpdateBuilder::create($qb, $driver);
+        $builder = $qb->conflictBuilder();
 
         $builder->expression('total', '(price * quantity) + tax');
         $result = $builder->build();
 
-        self::assertStringContainsString('`total` = (price * quantity) + tax', $result);
+        Assert::same($result, '`total` = (price * quantity) + tax');
     }
 
     public function testExpressionWithInvalidCharactersThrowsException(): void
     {
         $qb = new QueryBuilder();
-        $driver = DriverFactory::create(QbConsts::DRIVER_MYSQL);
-        $builder = MysqlOnDuplicateKeyUpdateBuilder::create($qb, $driver);
+        $builder = $qb->conflictBuilder();
 
-        $this->expectException(InvalidIdentifierException::class);
-        $this->expectExceptionMessage('Invalid expression');
+        Expect::exception(InvalidIdentifierException::class)->withMessageContaining('Invalid expression');
 
         $builder->expression('price', 'price * 1.1; DROP TABLE users');
     }
@@ -69,11 +62,9 @@ final class ExpressionsTraitTest extends TestCase
     public function testExpressionWithDangerousPatternsThrowsException(): void
     {
         $qb = new QueryBuilder();
-        $driver = DriverFactory::create(QbConsts::DRIVER_MYSQL);
-        $builder = MysqlOnDuplicateKeyUpdateBuilder::create($qb, $driver);
+        $builder = $qb->conflictBuilder();
 
-        $this->expectException(InvalidIdentifierException::class);
-        $this->expectExceptionMessage('dangerous SQL patterns');
+        Expect::exception(InvalidIdentifierException::class)->withMessageContaining('dangerous SQL patterns');
 
         $builder->expression('price', 'price DROP TABLE users');
     }
@@ -81,11 +72,9 @@ final class ExpressionsTraitTest extends TestCase
     public function testExpressionWithDropTableThrowsException(): void
     {
         $qb = new QueryBuilder();
-        $driver = DriverFactory::create(QbConsts::DRIVER_MYSQL);
-        $builder = MysqlOnDuplicateKeyUpdateBuilder::create($qb, $driver);
+        $builder = $qb->conflictBuilder();
 
-        $this->expectException(InvalidIdentifierException::class);
-        $this->expectExceptionMessage('dangerous SQL patterns');
+        Expect::exception(InvalidIdentifierException::class)->withMessageContaining('dangerous SQL patterns');
 
         $builder->expression('price', 'price DROP TABLE users');
     }
@@ -93,8 +82,7 @@ final class ExpressionsTraitTest extends TestCase
     public function testCaseExpressionWithValidCase(): void
     {
         $qb = new QueryBuilder();
-        $driver = DriverFactory::create(QbConsts::DRIVER_MYSQL);
-        $builder = MysqlOnDuplicateKeyUpdateBuilder::create($qb, $driver);
+        $builder = $qb->conflictBuilder();
 
         $builder->caseExpression('status', [
             'WHEN count > 10 THEN "active"',
@@ -102,17 +90,13 @@ final class ExpressionsTraitTest extends TestCase
         ]);
         $result = $builder->build();
 
-        self::assertStringContainsString('`status` = CASE', $result);
-        self::assertStringContainsString('WHEN count > 10 THEN "active"', $result);
-        self::assertStringContainsString('ELSE "pending"', $result);
-        self::assertStringContainsString('END', $result);
+        Assert::same($result, '`status` = CASE WHEN count > 10 THEN "active" ELSE "pending" END');
     }
 
     public function testCaseExpressionWithMultipleWhenClauses(): void
     {
         $qb = new QueryBuilder();
-        $driver = DriverFactory::create(QbConsts::DRIVER_MYSQL);
-        $builder = MysqlOnDuplicateKeyUpdateBuilder::create($qb, $driver);
+        $builder = $qb->conflictBuilder();
 
         $builder->caseExpression('discount', [
             'WHEN total > 1000 THEN 0.1',
@@ -121,20 +105,15 @@ final class ExpressionsTraitTest extends TestCase
         ]);
         $result = $builder->build();
 
-        self::assertStringContainsString('CASE', $result);
-        self::assertStringContainsString('WHEN total > 1000 THEN 0.1', $result);
-        self::assertStringContainsString('WHEN total > 500 THEN 0.05', $result);
-        self::assertStringContainsString('ELSE 0', $result);
+        Assert::same($result, '`discount` = CASE WHEN total > 1000 THEN 0.1 WHEN total > 500 THEN 0.05 ELSE 0 END');
     }
 
     public function testCaseExpressionWithInvalidFormatThrowsException(): void
     {
         $qb = new QueryBuilder();
-        $driver = DriverFactory::create(QbConsts::DRIVER_MYSQL);
-        $builder = MysqlOnDuplicateKeyUpdateBuilder::create($qb, $driver);
+        $builder = $qb->conflictBuilder();
 
-        $this->expectException(InvalidIdentifierException::class);
-        $this->expectExceptionMessage('Invalid CASE condition');
+        Expect::exception(InvalidIdentifierException::class)->withMessageContaining('Invalid CASE condition');
 
         $builder->caseExpression('status', ['INVALID FORMAT']);
     }
@@ -142,11 +121,9 @@ final class ExpressionsTraitTest extends TestCase
     public function testCaseExpressionWithDangerousPatternsThrowsException(): void
     {
         $qb = new QueryBuilder();
-        $driver = DriverFactory::create(QbConsts::DRIVER_MYSQL);
-        $builder = MysqlOnDuplicateKeyUpdateBuilder::create($qb, $driver);
+        $builder = $qb->conflictBuilder();
 
-        $this->expectException(InvalidIdentifierException::class);
-        $this->expectExceptionMessage('dangerous SQL patterns');
+        Expect::exception(InvalidIdentifierException::class)->withMessageContaining('dangerous SQL patterns');
 
         $builder->caseExpression('status', [
             'WHEN count > 10 THEN "active"; DROP TABLE users',
@@ -156,10 +133,9 @@ final class ExpressionsTraitTest extends TestCase
     public function testExpressionValidatesFieldName(): void
     {
         $qb = new QueryBuilder();
-        $driver = DriverFactory::create(QbConsts::DRIVER_MYSQL);
-        $builder = MysqlOnDuplicateKeyUpdateBuilder::create($qb, $driver);
+        $builder = $qb->conflictBuilder();
 
-        $this->expectException(InvalidIdentifierException::class);
+        Expect::exception(InvalidIdentifierException::class);
 
         $builder->expression('invalid-field-name;', 'price * 1.1');
     }
@@ -167,8 +143,7 @@ final class ExpressionsTraitTest extends TestCase
     public function testMultipleExpressionsCanBeChained(): void
     {
         $qb = new QueryBuilder();
-        $driver = DriverFactory::create(QbConsts::DRIVER_MYSQL);
-        $builder = MysqlOnDuplicateKeyUpdateBuilder::create($qb, $driver);
+        $builder = $qb->conflictBuilder();
 
         $builder->expression('price', 'price * 1.1')
             ->expression('total', 'price + tax')
@@ -176,32 +151,32 @@ final class ExpressionsTraitTest extends TestCase
         ;
 
         $result = $builder->build();
-        self::assertStringContainsString('`price` = price * 1.1', $result);
-        self::assertStringContainsString('`total` = price + tax', $result);
-        self::assertStringContainsString('CASE', $result);
+        Assert::same(
+            $result,
+            '`price` = price * 1.1, `total` = price + tax, `status` = CASE WHEN count > 10 THEN '
+                . '"active" ELSE "pending" END'
+        );
     }
 
     public function testExpressionWithDivision(): void
     {
         $qb = new QueryBuilder();
-        $driver = DriverFactory::create(QbConsts::DRIVER_MYSQL);
-        $builder = MysqlOnDuplicateKeyUpdateBuilder::create($qb, $driver);
+        $builder = $qb->conflictBuilder();
 
         $builder->expression('average', 'total / count');
         $result = $builder->build();
 
-        self::assertStringContainsString('`average` = total / count', $result);
+        Assert::same($result, '`average` = total / count');
     }
 
     public function testExpressionWithModulo(): void
     {
         $qb = new QueryBuilder();
-        $driver = DriverFactory::create(QbConsts::DRIVER_MYSQL);
-        $builder = MysqlOnDuplicateKeyUpdateBuilder::create($qb, $driver);
+        $builder = $qb->conflictBuilder();
 
         $builder->expression('remainder', 'count % 10');
         $result = $builder->build();
 
-        self::assertStringContainsString('`remainder` = count % 10', $result);
+        Assert::same($result, '`remainder` = count % 10');
     }
 }

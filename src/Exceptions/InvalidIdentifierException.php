@@ -15,9 +15,12 @@ namespace QBuilder\Exceptions;
  * - Expression syntax
  * - Operators
  * - Order directions
+ *
+ * @api
  */
 class InvalidIdentifierException extends QBuilderException
 {
+    // phpcs:ignore Generic.CodeAnalysis.UselessOverridingMethod -- overrides default message and code
     public function __construct(
         string $message = 'Invalid identifier provided',
         int $code = 500,

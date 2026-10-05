@@ -5,8 +5,6 @@ declare(strict_types=1);
 namespace QBuilder\Drivers\Mssql;
 
 use QBuilder\Builder\AbstractMergeBuilder;
-use QBuilder\Drivers\DriverInterface;
-use QBuilder\QueryBuilder;
 
 /**
  * MERGE builder for MS SQL Server.
@@ -14,29 +12,19 @@ use QBuilder\QueryBuilder;
  * MS SQL Server-specific syntax for handling duplicates on INSERT using MERGE statement.
  * Allows building complex MERGE expressions with WHEN MATCHED and WHEN NOT MATCHED.
  *
- * @example
- * // Basic MERGE
- * $builder = MssqlMergeBuilder::create($qb, $driver)
- *     ->conflictTarget(['email'])
- *     ->set('name', $userName)
- *     ->set('updated_at', 'GETDATE()');
+ * MERGE is built from the rows already added to INSERT, so insertRow() goes before insertConflictHandler().
  *
- * // With increment
- * $builder = MssqlMergeBuilder::create($qb, $driver)
- *     ->conflictTarget(['user_id', 'product_id'])
- *     ->increment('view_count', 1)
- *     ->sqlFunction('last_viewed', 'GETDATE()');
+ * @example
+ * $qb->insert('users')
+ *     ->insertRow(['email' => $email, 'name' => $userName, 'view_count' => 1])
+ *     ->insertConflictHandler(
+ *         $qb->conflictBuilder()
+ *             ->conflictTarget(['email'])
+ *             ->set('name', $userName)
+ *             ->increment('view_count')
+ *             ->sqlFunction('updated_at', 'GETDATE()')
+ *     );
+ *
+ * @internal
  */
-class MssqlMergeBuilder extends AbstractMergeBuilder
-{
-    /**
-     * Create new builder instance.
-     *
-     * @param QueryBuilder    $queryBuilder Parent QueryBuilder
-     * @param DriverInterface $driver       MSSQL driver
-     */
-    public static function create(QueryBuilder $queryBuilder, DriverInterface $driver): self
-    {
-        return new self($queryBuilder, $driver);
-    }
-}
+final class MssqlMergeBuilder extends AbstractMergeBuilder {}

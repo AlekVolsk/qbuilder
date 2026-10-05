@@ -15,8 +15,10 @@ use QBuilder\QueryBuilder;
  * MS SQL Server driver for QueryBuilder.
  *
  * Implements specific SQL query building logic for Microsoft SQL Server.
+ *
+ * @internal
  */
-class MssqlDriver extends AbstractDriver
+final class MssqlDriver extends AbstractDriver
 {
     public function getSqlBuilder(QueryBuilder $queryBuilder): SqlBuilderInterface
     {
@@ -57,20 +59,24 @@ class MssqlDriver extends AbstractDriver
         return '';
     }
 
+    /**
+     * OFFSET ... FETCH is part of the ORDER BY clause in T-SQL.
+     */
+    #[\Override]
+    public function limitRequiresOrderBy(): bool
+    {
+        return true;
+    }
+
     public function getLimitSql(int $limit, ?int $offset = null, bool $withTies = false): string
     {
         $rowsClause = $withTies ? ' ROWS WITH TIES' : ' ROWS ONLY';
 
         if (null !== $offset && $offset > 0) {
-            return "\nOFFSET ".$offset." ROWS\nFETCH NEXT ".$limit.$rowsClause;
+            return "\nOFFSET " . $offset . " ROWS\nFETCH NEXT " . $limit . $rowsClause;
         }
 
-        return "\nOFFSET 0 ROWS\nFETCH NEXT ".$limit.$rowsClause;
-    }
-
-    public function getName(): string
-    {
-        return 'mssql';
+        return "\nOFFSET 0 ROWS\nFETCH NEXT " . $limit . $rowsClause;
     }
 
     /**
@@ -109,8 +115,8 @@ class MssqlDriver extends AbstractDriver
             if (QbConsts::INDEX_FORCE !== $hint['type'] || '' !== $hint['for']) {
                 throw new UnsupportedFeatureException(
                     'MS SQL Server supports only forceIndex() without scope: its INDEX table hint always forces '
-                        .'the index. '.$hint['type'].' INDEX'.('' === $hint['for'] ? '' : ' FOR '.$hint['for'])
-                        .' has no equivalent'
+                        . 'the index. ' . $hint['type'] . ' INDEX' . ('' === $hint['for'] ? '' : ' FOR ' . $hint['for'])
+                        . ' has no equivalent'
                 );
             }
 
@@ -121,6 +127,6 @@ class MssqlDriver extends AbstractDriver
             return '';
         }
 
-        return ' WITH (INDEX('.implode(', ', array_map($this->quoteName(...), $indexes)).'))';
+        return ' WITH (INDEX(' . implode(', ', array_map($this->quoteName(...), $indexes)) . '))';
     }
 }

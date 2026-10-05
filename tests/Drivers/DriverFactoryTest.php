@@ -4,26 +4,27 @@ declare(strict_types=1);
 
 namespace QBuilder\Tests;
 
-use PHPUnit\Framework\Attributes\DataProvider;
-use PHPUnit\Framework\TestCase;
 use QBuilder\Drivers\DriverFactory;
 use QBuilder\Drivers\DriverInterface;
 use QBuilder\Exceptions\UnsupportedFeatureException;
 use QBuilder\QbConsts;
+use Testo\Assert;
+use Testo\Data\DataProvider;
+use Testo\Expect;
+use Testo\Test;
 
 /**
  * @internal
- *
- * @coversNothing
  */
-final class DriverFactoryTest extends TestCase
+#[Test]
+final class DriverFactoryTest
 {
     #[DataProvider('provideSupportedDrivers')]
     public function testCreateSupportedDriver(string $driverType): void
     {
         $driver = DriverFactory::create($driverType);
 
-        self::assertInstanceOf(DriverInterface::class, $driver);
+        Assert::instanceOf($driver, DriverInterface::class);
     }
 
     /**
@@ -43,60 +44,35 @@ final class DriverFactoryTest extends TestCase
 
     public function testCreateUnsupportedDriverThrowsException(): void
     {
-        $this->expectException(UnsupportedFeatureException::class);
-        $this->expectExceptionMessage('Unsupported database driver');
+        Expect::exception(UnsupportedFeatureException::class)->withMessageContaining('Unsupported database driver');
 
         DriverFactory::create('unsupported_driver');
     }
 
     public function testCreateEmptyDriverThrowsException(): void
     {
-        $this->expectException(UnsupportedFeatureException::class);
-        $this->expectExceptionMessage('Unsupported database driver');
+        Expect::exception(UnsupportedFeatureException::class)->withMessageContaining('Unsupported database driver');
 
         DriverFactory::create('');
     }
 
-    #[DataProvider('provideSupportedDrivers')]
-    public function testIsSupportedReturnsTrueForSupportedDrivers(string $driverType): void
+    public function testEverySupportedDriverIsCreatable(): void
     {
-        self::assertTrue(DriverFactory::isSupported($driverType));
-    }
+        $supported = QbConsts::getSupportedDrivers();
 
-    public function testIsSupportedReturnsFalseForUnsupportedDriver(): void
-    {
-        self::assertFalse(DriverFactory::isSupported('unsupported_driver'));
-    }
+        Assert::array(array_values(array_unique($supported)))->sameElementsAs([
+            QbConsts::DRIVER_MYSQL,
+            QbConsts::DRIVER_PDO_MYSQL,
+            QbConsts::DRIVER_PGSQL,
+            QbConsts::DRIVER_SQLITE,
+            QbConsts::DRIVER_MSSQL,
+            QbConsts::DRIVER_ORACLE,
+            QbConsts::DRIVER_CLICKHOUSE,
+        ]);
 
-    public function testIsSupportedReturnsFalseForEmptyString(): void
-    {
-        self::assertFalse(DriverFactory::isSupported(''));
-    }
-
-    public function testGetSupportedDriversReturnsAllDrivers(): void
-    {
-        $supported = DriverFactory::getSupportedDrivers();
-
-        self::assertContains(QbConsts::DRIVER_MYSQL, $supported);
-        self::assertContains(QbConsts::DRIVER_PDO_MYSQL, $supported);
-        self::assertContains(QbConsts::DRIVER_POSTGRESQL, $supported);
-        self::assertContains(QbConsts::DRIVER_PGSQL, $supported);
-        self::assertContains(QbConsts::DRIVER_SQLITE, $supported);
-        self::assertContains(QbConsts::DRIVER_MSSQL, $supported);
-        self::assertContains(QbConsts::DRIVER_ORACLE, $supported);
-        self::assertContains(QbConsts::DRIVER_CLICKHOUSE, $supported);
-        self::assertCount(8, $supported);
-    }
-
-    public function testCreateReturnsSameInstanceForSameDriver(): void
-    {
-        $driver1 = DriverFactory::create(QbConsts::DRIVER_MYSQL);
-        $driver2 = DriverFactory::create(QbConsts::DRIVER_MYSQL);
-
-        self::assertInstanceOf(DriverInterface::class, $driver1);
-        self::assertInstanceOf(DriverInterface::class, $driver2);
-
-        self::assertNotSame($driver1, $driver2);
+        foreach ($supported as $driverType) {
+            Assert::instanceOf(DriverFactory::create($driverType), DriverInterface::class);
+        }
     }
 
     public function testCreateReturnsDifferentDriversForDifferentTypes(): void
@@ -104,8 +80,8 @@ final class DriverFactoryTest extends TestCase
         $mysqlDriver = DriverFactory::create(QbConsts::DRIVER_MYSQL);
         $pgsqlDriver = DriverFactory::create(QbConsts::DRIVER_PGSQL);
 
-        self::assertInstanceOf(DriverInterface::class, $mysqlDriver);
-        self::assertInstanceOf(DriverInterface::class, $pgsqlDriver);
-        self::assertNotSame($mysqlDriver, $pgsqlDriver);
+        Assert::instanceOf($mysqlDriver, DriverInterface::class);
+        Assert::instanceOf($pgsqlDriver, DriverInterface::class);
+        Assert::notSame($pgsqlDriver, $mysqlDriver);
     }
 }

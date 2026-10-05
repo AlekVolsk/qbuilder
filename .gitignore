@@ -15,4 +15,7 @@ composer.lock
 build-dev
 coverage
 coverage.xml
-.phpunit.result.cache
+
+# AI
+.claude/
+CLAUDE.md

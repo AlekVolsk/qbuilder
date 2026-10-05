@@ -9,6 +9,8 @@ namespace QBuilder\Drivers;
  *
  * Responsible for forming final SQL from query settings
  * taking into account specific driver features.
+ *
+ * @internal
  */
 interface SqlBuilderInterface
 {
@@ -45,9 +47,4 @@ interface SqlBuilderInterface
      * Build CALL/EXEC for stored procedure invocation.
      */
     public function buildProcedure(): string;
-
-    /**
-     * Get built query.
-     */
-    public function getBuiltQuery(): string;
 }

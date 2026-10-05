@@ -4,18 +4,19 @@ declare(strict_types=1);
 
 namespace QBuilder\Tests;
 
-use PHPUnit\Framework\TestCase;
 use QBuilder\Builder\UnionBuilder;
 use QBuilder\Condition\ConditionBy;
 use QBuilder\QbConsts;
 use QBuilder\QueryBuilder;
+use Testo\Assert;
+use Testo\Data\DataProvider;
+use Testo\Test;
 
 /**
  * @internal
- *
- * @coversNothing
  */
-final class UnionBuilderTest extends TestCase
+#[Test]
+final class UnionBuilderTest
 {
     public function testUnionSimple(): void
     {
@@ -34,9 +35,9 @@ final class UnionBuilderTest extends TestCase
         $sql = $union->add($query1)->add($query2)->build();
 
         $expected = "SELECT `id`, `name`\nFROM `users`\nWHERE (`status` = 'active')\nUNION\n"
-            ."SELECT `id`, `name`\nFROM `users`\nWHERE (`status` = 'pending')";
+            . "SELECT `id`, `name`\nFROM `users`\nWHERE (`status` = 'pending')";
 
-        self::assertSame($expected, $sql);
+        Assert::same($sql, $expected);
     }
 
     public function testUnionAll(): void
@@ -51,7 +52,7 @@ final class UnionBuilderTest extends TestCase
 
         $expected = "SELECT `email`\nFROM `customers`\nUNION ALL\nSELECT `email`\nFROM `suppliers`";
 
-        self::assertSame($expected, $sql);
+        Assert::same($sql, $expected);
     }
 
     public function testUnionWithOrderBy(): void
@@ -72,11 +73,11 @@ final class UnionBuilderTest extends TestCase
         $union = new UnionBuilder($qb);
         $sql = $union->add($query1)->add($query2)->orderBy($orderBy)->build();
 
-        $expected = "(SELECT `id`, `name`\nFROM `users`\nWHERE (`type` = 'admin')\nUNION\n"
-            ."SELECT `id`, `name`\nFROM `users`\nWHERE (`type` = 'moderator'))\n"
-            .'ORDER BY `name` ASC';
+        $expected = "SELECT `id`, `name`\nFROM `users`\nWHERE (`type` = 'admin')\nUNION\n"
+            . "SELECT `id`, `name`\nFROM `users`\nWHERE (`type` = 'moderator')\n"
+            . 'ORDER BY `name` ASC';
 
-        self::assertSame($expected, $sql);
+        Assert::same($sql, $expected);
     }
 
     public function testUnionWithLimit(): void
@@ -89,47 +90,87 @@ final class UnionBuilderTest extends TestCase
         $union = new UnionBuilder($qb);
         $sql = $union->add($query1)->add($query2)->limit(10)->build();
 
-        $expected = "(SELECT `id`, `title`\nFROM `articles`\nUNION\n"
-            ."SELECT `id`, `title`\nFROM `news`)\nLIMIT 10";
+        $expected = "SELECT `id`, `title`\nFROM `articles`\nUNION\n"
+            . "SELECT `id`, `title`\nFROM `news`\nLIMIT 10";
 
-        self::assertSame($expected, $sql);
+        Assert::same($sql, $expected);
 
         $sql = $union->build(true);
 
-        self::assertSame(
-            '(SELECT `id`, `title` FROM `articles` UNION SELECT `id`, `title` FROM `news`) LIMIT 10',
-            $sql
+        Assert::same($sql, 'SELECT `id`, `title` FROM `articles` UNION SELECT `id`, `title` FROM `news` LIMIT 10');
+    }
+
+    /**
+     * @param non-empty-string $expected
+     */
+    #[DataProvider('provideUnionOrderByAndLimitPerDialectCases')]
+    public function testUnionOrderByAndLimitPerDialect(string $driver, string $expected): void
+    {
+        $qb = new QueryBuilder($driver);
+        $union = (new UnionBuilder($qb))
+            ->add($qb->subQuery()->select('id')->from('users'))
+            ->add($qb->subQuery()->select('id')->from('admins'))
+            ->orderBy(ConditionBy::orderBy()->desc('id'))
+            ->limit(5, 10)
+        ;
+
+        Assert::same($union->build(true), $expected);
+    }
+
+    /**
+     * @return iterable<string, array{string, non-empty-string}>
+     */
+    public static function provideUnionOrderByAndLimitPerDialectCases(): iterable
+    {
+        yield 'MySQL' => [
+            QbConsts::DRIVER_PDO_MYSQL,
+            'SELECT `id` FROM `users` UNION SELECT `id` FROM `admins` ORDER BY `id` DESC LIMIT 10, 5',
+        ];
+
+        yield 'PostgreSQL' => [
+            QbConsts::DRIVER_PGSQL,
+            'SELECT "id" FROM "users" UNION SELECT "id" FROM "admins" ORDER BY "id" DESC LIMIT 5 OFFSET 10',
+        ];
+
+        yield 'SQLite' => [
+            QbConsts::DRIVER_SQLITE,
+            'SELECT "id" FROM "users" UNION SELECT "id" FROM "admins" ORDER BY "id" DESC LIMIT 5 OFFSET 10',
+        ];
+
+        yield 'MS SQL Server' => [
+            QbConsts::DRIVER_MSSQL,
+            'SELECT [id] FROM [users] UNION SELECT [id] FROM [admins] ORDER BY [id] DESC '
+                . 'OFFSET 10 ROWS FETCH NEXT 5 ROWS ONLY',
+        ];
+
+        yield 'Oracle' => [
+            QbConsts::DRIVER_ORACLE,
+            'SELECT "ID" FROM "USERS" UNION SELECT "ID" FROM "ADMINS" ORDER BY "ID" DESC '
+                . 'OFFSET 10 ROWS FETCH NEXT 5 ROWS ONLY',
+        ];
+
+        yield 'ClickHouse' => [
+            QbConsts::DRIVER_CLICKHOUSE,
+            'SELECT * FROM ( SELECT `id` FROM `users` UNION DISTINCT SELECT `id` FROM `admins` ) '
+                . 'ORDER BY `id` DESC LIMIT 10, 5',
+        ];
+    }
+
+    public function testMssqlUnionLimitWithoutOrderByGetsNeutralOrder(): void
+    {
+        $qb = new QueryBuilder(QbConsts::DRIVER_MSSQL);
+        $union = (new UnionBuilder($qb))
+            ->add($qb->subQuery()->select('id')->from('users'))
+            ->add($qb->subQuery()->select('id')->from('admins'))
+            ->all()
+            ->limit(5)
+        ;
+
+        Assert::same(
+            $union->build(true),
+            'SELECT [id] FROM [users] UNION ALL SELECT [id] FROM [admins] ORDER BY (SELECT NULL) '
+                . 'OFFSET 0 ROWS FETCH NEXT 5 ROWS ONLY'
         );
-    }
-
-    public function testUnionWithOffset(): void
-    {
-        $qb = new QueryBuilder();
-
-        $query1 = $qb->select('id')->from('table1');
-        $query2 = $qb->subQuery()->select('id')->from('table2');
-
-        $union = new UnionBuilder($qb);
-        $sql = $union->add($query1)->add($query2)->limit(10, 20)->build();
-
-        self::assertStringContainsString('LIMIT 10', $sql);
-        self::assertStringContainsString('OFFSET 20', $sql);
-    }
-
-    public function testUnionWithOrderByAndLimit(): void
-    {
-        $qb = new QueryBuilder();
-
-        $query1 = $qb->select('id', 'name')->from('users');
-        $query2 = $qb->subQuery()->select('id', 'name')->from('admins');
-
-        $orderBy = ConditionBy::orderBy()->desc('name');
-
-        $union = new UnionBuilder($qb);
-        $sql = $union->add($query1)->add($query2)->orderBy($orderBy)->limit(5)->build();
-
-        self::assertStringContainsString('ORDER BY', $sql);
-        self::assertStringContainsString('LIMIT 5', $sql);
     }
 
     public function testBuildReturnsEmptyStringForEmptyQueries(): void
@@ -137,7 +178,7 @@ final class UnionBuilderTest extends TestCase
         $qb = new QueryBuilder();
         $union = new UnionBuilder($qb);
 
-        self::assertSame('', $union->build());
+        Assert::same($union->build(), '');
     }
 
     public function testBuildReturnsSingleQueryWithoutUnion(): void
@@ -148,8 +189,7 @@ final class UnionBuilderTest extends TestCase
         $union = new UnionBuilder($qb);
         $sql = $union->add($query)->build();
 
-        self::assertStringNotContainsString('UNION', $sql);
-        self::assertStringContainsString('SELECT', $sql);
+        Assert::same($sql, "SELECT `id`\nFROM `users`");
     }
 
     public function testAddWithStringQuery(): void
@@ -161,9 +201,7 @@ final class UnionBuilderTest extends TestCase
         $union->add('SELECT id FROM admins');
 
         $sql = $union->build();
-        self::assertStringContainsString('SELECT id FROM users', $sql);
-        self::assertStringContainsString('SELECT id FROM admins', $sql);
-        self::assertStringContainsString('UNION', $sql);
+        Assert::same($sql, "SELECT id FROM users\nUNION\nSELECT id FROM admins");
     }
 
     public function testAllWithFalseParameter(): void
@@ -181,9 +219,8 @@ final class UnionBuilderTest extends TestCase
         $union2->all(false);
         $sql2 = $union2->add($query1)->add($query2)->build();
 
-        self::assertStringContainsString('UNION ALL', $sql1);
-        self::assertStringContainsString('UNION', $sql2);
-        self::assertStringNotContainsString('UNION ALL', $sql2);
+        Assert::same($sql1, "SELECT `id`\nFROM `users`\nUNION ALL\nSELECT `id`\nFROM `admins`");
+        Assert::same($sql2, "SELECT `id`\nFROM `users`\nUNION\nSELECT `id`\nFROM `admins`");
     }
 
     public function testLimitWithZeroRemovesLimit(): void
@@ -195,7 +232,7 @@ final class UnionBuilderTest extends TestCase
         $union->add($query)->limit(10)->limit(0);
 
         $sql = $union->build();
-        self::assertStringNotContainsString('LIMIT', $sql);
+        Assert::same($sql, "SELECT `id`\nFROM `users`");
     }
 
     public function testLimitWithNegativeRemovesLimit(): void
@@ -207,7 +244,7 @@ final class UnionBuilderTest extends TestCase
         $union->add($query)->limit(10)->limit(-1);
 
         $sql = $union->build();
-        self::assertStringNotContainsString('LIMIT', $sql);
+        Assert::same($sql, "SELECT `id`\nFROM `users`");
     }
 
     public function testResetClearsAllQueries(): void
@@ -219,14 +256,14 @@ final class UnionBuilderTest extends TestCase
         $union = new UnionBuilder($qb);
         $union->add($query1)->add($query2)->all(true)->limit(10);
 
-        self::assertFalse($union->isEmpty());
-        self::assertSame(2, $union->count());
+        Assert::false($union->isEmpty());
+        Assert::same($union->count(), 2);
 
         $union->reset();
 
-        self::assertTrue($union->isEmpty());
-        self::assertSame(0, $union->count());
-        self::assertSame('', $union->build());
+        Assert::true($union->isEmpty());
+        Assert::same($union->count(), 0);
+        Assert::same($union->build(), '');
     }
 
     public function testCountReturnsNumberOfQueries(): void
@@ -234,13 +271,13 @@ final class UnionBuilderTest extends TestCase
         $qb = new QueryBuilder();
         $union = new UnionBuilder($qb);
 
-        self::assertSame(0, $union->count());
+        Assert::same($union->count(), 0);
 
         $union->add($qb->select('id')->from('users'));
-        self::assertSame(1, $union->count());
+        Assert::same($union->count(), 1);
 
         $union->add($qb->subQuery()->select('id')->from('admins'));
-        self::assertSame(2, $union->count());
+        Assert::same($union->count(), 2);
     }
 
     public function testIsEmptyReturnsCorrectValue(): void
@@ -248,10 +285,10 @@ final class UnionBuilderTest extends TestCase
         $qb = new QueryBuilder();
         $union = new UnionBuilder($qb);
 
-        self::assertTrue($union->isEmpty());
+        Assert::true($union->isEmpty());
 
         $union->add($qb->select('id')->from('users'));
-        self::assertFalse($union->isEmpty());
+        Assert::false($union->isEmpty());
     }
 
     public function testBuildWithCompactFlag(): void
@@ -264,8 +301,7 @@ final class UnionBuilderTest extends TestCase
         $union = new UnionBuilder($qb);
         $sql = $union->add($query1)->add($query2)->build(true);
 
-        self::assertStringNotContainsString("\n\n", $sql);
-        self::assertStringContainsString('UNION', $sql);
+        Assert::same($sql, 'SELECT `id`, `name` FROM `users` UNION SELECT `id`, `name` FROM `admins`');
     }
 
     public function testUnionWithMultipleQueries(): void
@@ -280,6 +316,6 @@ final class UnionBuilderTest extends TestCase
         $sql = $union->add($query1)->add($query2)->add($query3)->build();
 
         $unionCount = substr_count($sql, 'UNION');
-        self::assertSame(2, $unionCount);
+        Assert::same($unionCount, 2);
     }
 }

@@ -17,6 +17,8 @@ $qb->select('status', 'COUNT(*) AS total')
 ### GROUP BY with Multiple Fields
 
 ```php
+use QBuilder\Condition\ConditionBy;
+
 $qb->select('country', 'city', 'COUNT(*) AS total')
     ->from('users')
     ->groupBy(
@@ -31,6 +33,8 @@ $qb->select('country', 'city', 'COUNT(*) AS total')
 ### GROUP BY with a Table
 
 ```php
+use QBuilder\Condition\ConditionBy;
+
 $qb->groupBy(
     ConditionBy::groupBy()
         ->add('status', 'orders')
@@ -43,6 +47,8 @@ $qb->groupBy(
 ### HAVING
 
 ```php
+use QBuilder\Condition\ConditionBy;
+
 $qb->select('status', 'COUNT(*) AS total')
     ->from('orders')
     ->groupBy(ConditionBy::groupBy()->add('status'))
@@ -74,6 +80,8 @@ $qb->having()
 #### Ascending (ASC)
 
 ```php
+use QBuilder\Condition\ConditionBy;
+
 $qb->orderBy(ConditionBy::orderBy()->asc('name'));
 
 // ORDER BY `name` ASC
@@ -82,6 +90,8 @@ $qb->orderBy(ConditionBy::orderBy()->asc('name'));
 #### Descending (DESC)
 
 ```php
+use QBuilder\Condition\ConditionBy;
+
 $qb->orderBy(ConditionBy::orderBy()->desc('created_at'));
 
 // ORDER BY `created_at` DESC
@@ -90,6 +100,8 @@ $qb->orderBy(ConditionBy::orderBy()->desc('created_at'));
 #### Multiple Fields
 
 ```php
+use QBuilder\Condition\ConditionBy;
+
 $qb->orderBy(
     ConditionBy::orderBy()
         ->asc('country')
@@ -103,6 +115,8 @@ $qb->orderBy(
 #### With a Table Specified
 
 ```php
+use QBuilder\Condition\ConditionBy;
+
 $qb->orderBy(
     ConditionBy::orderBy()
         ->asc('status', 'orders')
@@ -133,6 +147,8 @@ $qb->limit(10, 20);
 ### LIMIT WITH TIES (ClickHouse, PostgreSQL, MS SQL, Oracle)
 
 ```php
+use QBuilder\Condition\ConditionBy;
+
 $qb->select('*')
     ->from('users')
     ->orderBy(ConditionBy::orderBy()->desc('score'))

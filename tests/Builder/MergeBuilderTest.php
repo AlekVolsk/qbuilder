@@ -4,42 +4,43 @@ declare(strict_types=1);
 
 namespace QBuilder\Tests;
 
-use PHPUnit\Framework\TestCase;
 use QBuilder\Drivers\Mssql\MssqlMergeBuilder;
 use QBuilder\Drivers\Oracle\OracleMergeBuilder;
+use QBuilder\Exceptions\MissingRequirementException;
 use QBuilder\QbConsts;
 use QBuilder\QueryBuilder;
+use Testo\Assert;
+use Testo\Data\DataProvider;
+use Testo\Expect;
+use Testo\Test;
 
 /**
  * @internal
- *
- * @coversNothing
  */
-final class MergeBuilderTest extends TestCase
+#[Test]
+final class MergeBuilderTest
 {
-    public function testMssqlMergeBuilderCreateReturnsInstance(): void
+    public function testMssqlConflictBuilderIsMerge(): void
     {
         $qb = new QueryBuilder(QbConsts::DRIVER_MSSQL);
-        $driver = $qb->getDriverInstance();
-        $builder = MssqlMergeBuilder::create($qb, $driver);
+        $builder = $qb->conflictBuilder();
 
-        self::assertInstanceOf(MssqlMergeBuilder::class, $builder);
+        Assert::instanceOf($builder, MssqlMergeBuilder::class);
     }
 
-    public function testOracleMergeBuilderCreateReturnsInstance(): void
+    public function testOracleConflictBuilderIsMerge(): void
     {
         $qb = new QueryBuilder(QbConsts::DRIVER_ORACLE);
-        $driver = $qb->getDriverInstance();
-        $builder = OracleMergeBuilder::create($qb, $driver);
+        $builder = $qb->conflictBuilder();
 
-        self::assertInstanceOf(OracleMergeBuilder::class, $builder);
+        Assert::instanceOf($builder, OracleMergeBuilder::class);
     }
 
-    public function testBuildReturnsEmptyStringWhenUpdatesAreEmpty(): void
+    #[DataProvider('provideMergeDrivers')]
+    public function testBuildReturnsEmptyStringWhenUpdatesAreEmpty(string $driver): void
     {
-        $qb = new QueryBuilder(QbConsts::DRIVER_MSSQL);
-        $driver = $qb->getDriverInstance();
-        $builder = MssqlMergeBuilder::create($qb, $driver);
+        $qb = new QueryBuilder($driver);
+        $builder = $qb->conflictBuilder();
 
         $qb->insert('users')
             ->insertRow(['email' => 'test@example.com', 'name' => 'Test'])
@@ -47,59 +48,48 @@ final class MergeBuilderTest extends TestCase
 
         $builder->conflictTarget(['email']);
 
-        self::assertSame('', $builder->build());
+        Assert::same($builder->build(), '');
     }
 
-    public function testBuildReturnsEmptyStringWhenConflictFieldsAreEmpty(): void
+    #[DataProvider('provideMergeDrivers')]
+    public function testMergeWithoutConflictTargetIsRejected(string $driver): void
     {
-        $qb = new QueryBuilder(QbConsts::DRIVER_MSSQL);
-        $driver = $qb->getDriverInstance();
-        $builder = MssqlMergeBuilder::create($qb, $driver);
+        $qb = new QueryBuilder($driver);
+        $builder = $qb->conflictBuilder()->set('name', 'Updated');
+        $qb->insert('users')->insertRow(['email' => 'test@example.com', 'name' => 'Test']);
 
-        $qb->insert('users')
-            ->insertRow(['email' => 'test@example.com', 'name' => 'Test'])
-        ;
+        Expect::exception(MissingRequirementException::class)->withMessageContaining('MERGE needs a conflict target');
 
-        $builder->set('name', 'Updated');
-
-        self::assertSame('', $builder->build());
+        $builder->build();
     }
 
-    public function testBuildReturnsEmptyStringWhenInsertRowsAreEmpty(): void
+    #[DataProvider('provideMergeDrivers')]
+    public function testMergeBeforeInsertRowsIsRejected(string $driver): void
     {
-        $qb = new QueryBuilder(QbConsts::DRIVER_MSSQL);
-        $driver = $qb->getDriverInstance();
-        $builder = MssqlMergeBuilder::create($qb, $driver);
-
+        $qb = new QueryBuilder($driver);
+        $builder = $qb->conflictBuilder()->conflictTarget(['email'])->set('name', 'Updated');
         $qb->insert('users');
 
-        $builder->conflictTarget(['email'])
-            ->set('name', 'Updated')
+        Expect::exception(MissingRequirementException::class)
+            ->withMessageContaining('call insertRow() before insertConflictHandler()')
         ;
 
-        self::assertSame('', $builder->build());
+        $qb->insertConflictHandler($builder);
     }
 
-    public function testBuildReturnsEmptyStringWhenInsertFieldsAreEmpty(): void
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function provideMergeDrivers(): iterable
     {
-        $qb = new QueryBuilder(QbConsts::DRIVER_MSSQL);
-        $driver = $qb->getDriverInstance();
-        $builder = MssqlMergeBuilder::create($qb, $driver);
-
-        $qb->insert('users');
-
-        $builder->conflictTarget(['email'])
-            ->set('name', 'Updated')
-        ;
-
-        self::assertSame('', $builder->build());
+        yield 'MS SQL Server' => [QbConsts::DRIVER_MSSQL];
+        yield 'Oracle' => [QbConsts::DRIVER_ORACLE];
     }
 
     public function testMssqlMergeBuilderBuildGeneratesCorrectMergeStatement(): void
     {
         $qb = new QueryBuilder(QbConsts::DRIVER_MSSQL);
-        $driver = $qb->getDriverInstance();
-        $builder = MssqlMergeBuilder::create($qb, $driver);
+        $builder = $qb->conflictBuilder();
 
         $qb->insert('users')
             ->insertRow(['email' => 'test@example.com', 'name' => 'Test', 'age' => 30])
@@ -111,20 +101,23 @@ final class MergeBuilderTest extends TestCase
             ->build()
         ;
 
-        self::assertStringContainsString('MERGE INTO', $sql);
-        self::assertStringContainsString('USING (VALUES', $sql);
-        self::assertStringContainsString('WHEN MATCHED THEN', $sql);
-        self::assertStringContainsString('UPDATE SET', $sql);
-        self::assertStringContainsString('WHEN NOT MATCHED THEN', $sql);
-        self::assertStringContainsString('INSERT', $sql);
-        self::assertStringContainsString('VALUES', $sql);
+        Assert::same(
+            $sql,
+            "MERGE INTO [users] AS target\n"
+                . "USING (VALUES ('test@example.com', 'Test', 30)) AS source ([email], [name], [age])\n"
+                . "ON target.[email] = source.[email]\n"
+                . "WHEN MATCHED THEN\n"
+                . "  UPDATE SET [name] = 'Updated', [age] = target.[age] + 1\n"
+                . "WHEN NOT MATCHED THEN\n"
+                . "  INSERT ([email], [name], [age])\n"
+                . '  VALUES (source.[email], source.[name], source.[age]);'
+        );
     }
 
     public function testOracleMergeBuilderBuildGeneratesCorrectMergeStatementForSingleRow(): void
     {
         $qb = new QueryBuilder(QbConsts::DRIVER_ORACLE);
-        $driver = $qb->getDriverInstance();
-        $builder = OracleMergeBuilder::create($qb, $driver);
+        $builder = $qb->conflictBuilder();
 
         $qb->insert('users')
             ->insertRow(['email' => 'test@example.com', 'name' => 'Test'])
@@ -135,21 +128,23 @@ final class MergeBuilderTest extends TestCase
             ->build()
         ;
 
-        self::assertStringContainsString('MERGE INTO', $sql);
-        self::assertStringContainsString('USING (', $sql);
-        self::assertStringContainsString('SELECT', $sql);
-        self::assertStringContainsString('FROM DUAL', $sql);
-        self::assertStringContainsString('WHEN MATCHED THEN', $sql);
-        self::assertStringContainsString('UPDATE SET', $sql);
-        self::assertStringContainsString('WHEN NOT MATCHED THEN', $sql);
-        self::assertStringContainsString('INSERT', $sql);
+        Assert::same(
+            $sql,
+            "MERGE INTO \"USERS\" target\n"
+                . 'USING (SELECT \'test@example.com\' AS "EMAIL", \'Test\' AS "NAME" FROM DUAL) source ON '
+                . "(target.\"EMAIL\" = source.\"EMAIL\")\n"
+                . "WHEN MATCHED THEN\n"
+                . "  UPDATE SET \"NAME\" = 'Updated'\n"
+                . "WHEN NOT MATCHED THEN\n"
+                . "  INSERT (\"EMAIL\", \"NAME\")\n"
+                . '  VALUES (source."EMAIL", source."NAME")'
+        );
     }
 
     public function testOracleMergeBuilderBuildGeneratesCorrectMergeStatementForMultipleRows(): void
     {
         $qb = new QueryBuilder(QbConsts::DRIVER_ORACLE);
-        $driver = $qb->getDriverInstance();
-        $builder = OracleMergeBuilder::create($qb, $driver);
+        $builder = $qb->conflictBuilder();
 
         $qb->insert('users')
             ->insertRow(['email' => 'test1@example.com', 'name' => 'Test1'])
@@ -161,16 +156,24 @@ final class MergeBuilderTest extends TestCase
             ->build()
         ;
 
-        self::assertStringContainsString('MERGE INTO', $sql);
-        self::assertStringContainsString('UNION ALL SELECT', $sql);
-        self::assertStringContainsString('FROM DUAL', $sql);
+        Assert::same(
+            $sql,
+            "MERGE INTO \"USERS\" target\n"
+                . "USING (SELECT 'test1@example.com' AS \"EMAIL\", 'Test1' AS \"NAME\" FROM DUAL\n"
+                . 'UNION ALL SELECT \'test2@example.com\' AS "EMAIL", \'Test2\' AS "NAME" FROM DUAL) source ON '
+                . "(target.\"EMAIL\" = source.\"EMAIL\")\n"
+                . "WHEN MATCHED THEN\n"
+                . "  UPDATE SET \"NAME\" = 'Updated'\n"
+                . "WHEN NOT MATCHED THEN\n"
+                . "  INSERT (\"EMAIL\", \"NAME\")\n"
+                . '  VALUES (source."EMAIL", source."NAME")'
+        );
     }
 
     public function testExcludedMethodInMergeBuilder(): void
     {
         $qb = new QueryBuilder(QbConsts::DRIVER_MSSQL);
-        $driver = $qb->getDriverInstance();
-        $builder = MssqlMergeBuilder::create($qb, $driver);
+        $builder = $qb->conflictBuilder();
 
         $qb->insert('users')
             ->insertRow(['email' => 'test@example.com', 'name' => 'Test'])
@@ -181,14 +184,23 @@ final class MergeBuilderTest extends TestCase
             ->build()
         ;
 
-        self::assertStringContainsString('source.[name]', $sql);
+        Assert::same(
+            $sql,
+            "MERGE INTO [users] AS target\n"
+                . "USING (VALUES ('test@example.com', 'Test')) AS source ([email], [name])\n"
+                . "ON target.[email] = source.[email]\n"
+                . "WHEN MATCHED THEN\n"
+                . "  UPDATE SET [name] = source.[name]\n"
+                . "WHEN NOT MATCHED THEN\n"
+                . "  INSERT ([email], [name])\n"
+                . '  VALUES (source.[email], source.[name]);'
+        );
     }
 
     public function testExcludedMethodWithDifferentFieldNames(): void
     {
         $qb = new QueryBuilder(QbConsts::DRIVER_MSSQL);
-        $driver = $qb->getDriverInstance();
-        $builder = MssqlMergeBuilder::create($qb, $driver);
+        $builder = $qb->conflictBuilder();
 
         $qb->insert('users')
             ->insertRow(['email' => 'test@example.com', 'user_name' => 'Test'])
@@ -199,14 +211,23 @@ final class MergeBuilderTest extends TestCase
             ->build()
         ;
 
-        self::assertStringContainsString('source.[user_name]', $sql);
+        Assert::same(
+            $sql,
+            "MERGE INTO [users] AS target\n"
+                . "USING (VALUES ('test@example.com', 'Test')) AS source ([email], [user_name])\n"
+                . "ON target.[email] = source.[email]\n"
+                . "WHEN MATCHED THEN\n"
+                . "  UPDATE SET [name] = source.[user_name]\n"
+                . "WHEN NOT MATCHED THEN\n"
+                . "  INSERT ([email], [user_name])\n"
+                . '  VALUES (source.[email], source.[user_name]);'
+        );
     }
 
     public function testSetWithNullValue(): void
     {
         $qb = new QueryBuilder(QbConsts::DRIVER_MSSQL);
-        $driver = $qb->getDriverInstance();
-        $builder = MssqlMergeBuilder::create($qb, $driver);
+        $builder = $qb->conflictBuilder();
 
         $qb->insert('users')
             ->insertRow(['email' => 'test@example.com', 'name' => 'Test'])
@@ -217,14 +238,23 @@ final class MergeBuilderTest extends TestCase
             ->build()
         ;
 
-        self::assertStringContainsString('[name] = NULL', $sql);
+        Assert::same(
+            $sql,
+            "MERGE INTO [users] AS target\n"
+                . "USING (VALUES ('test@example.com', 'Test')) AS source ([email], [name])\n"
+                . "ON target.[email] = source.[email]\n"
+                . "WHEN MATCHED THEN\n"
+                . "  UPDATE SET [name] = NULL\n"
+                . "WHEN NOT MATCHED THEN\n"
+                . "  INSERT ([email], [name])\n"
+                . '  VALUES (source.[email], source.[name]);'
+        );
     }
 
     public function testSetWithBooleanValues(): void
     {
         $qb = new QueryBuilder(QbConsts::DRIVER_MSSQL);
-        $driver = $qb->getDriverInstance();
-        $builder = MssqlMergeBuilder::create($qb, $driver);
+        $builder = $qb->conflictBuilder();
 
         $qb->insert('users')
             ->insertRow(['email' => 'test@example.com', 'active' => true])
@@ -235,11 +265,20 @@ final class MergeBuilderTest extends TestCase
             ->build()
         ;
 
-        self::assertStringContainsString('[active] = 1', $sql);
+        Assert::same(
+            $sql,
+            "MERGE INTO [users] AS target\n"
+                . "USING (VALUES ('test@example.com', 1)) AS source ([email], [active])\n"
+                . "ON target.[email] = source.[email]\n"
+                . "WHEN MATCHED THEN\n"
+                . "  UPDATE SET [active] = 1\n"
+                . "WHEN NOT MATCHED THEN\n"
+                . "  INSERT ([email], [active])\n"
+                . '  VALUES (source.[email], source.[active]);'
+        );
 
         $qb2 = new QueryBuilder(QbConsts::DRIVER_MSSQL);
-        $driver2 = $qb2->getDriverInstance();
-        $builder2 = MssqlMergeBuilder::create($qb2, $driver2);
+        $builder2 = $qb2->conflictBuilder();
         $qb2->insert('users')
             ->insertRow(['email' => 'test2@example.com', 'active' => false])
         ;
@@ -249,14 +288,23 @@ final class MergeBuilderTest extends TestCase
             ->build()
         ;
 
-        self::assertStringContainsString('[active] = 0', $sql2);
+        Assert::same(
+            $sql2,
+            "MERGE INTO [users] AS target\n"
+                . "USING (VALUES ('test2@example.com', 0)) AS source ([email], [active])\n"
+                . "ON target.[email] = source.[email]\n"
+                . "WHEN MATCHED THEN\n"
+                . "  UPDATE SET [active] = 0\n"
+                . "WHEN NOT MATCHED THEN\n"
+                . "  INSERT ([email], [active])\n"
+                . '  VALUES (source.[email], source.[active]);'
+        );
     }
 
     public function testSetWithNumericValues(): void
     {
         $qb = new QueryBuilder(QbConsts::DRIVER_MSSQL);
-        $driver = $qb->getDriverInstance();
-        $builder = MssqlMergeBuilder::create($qb, $driver);
+        $builder = $qb->conflictBuilder();
 
         $qb->insert('users')
             ->insertRow(['email' => 'test@example.com', 'age' => 30])
@@ -267,14 +315,23 @@ final class MergeBuilderTest extends TestCase
             ->build()
         ;
 
-        self::assertStringContainsString('[age] = 25', $sql);
+        Assert::same(
+            $sql,
+            "MERGE INTO [users] AS target\n"
+                . "USING (VALUES ('test@example.com', 30)) AS source ([email], [age])\n"
+                . "ON target.[email] = source.[email]\n"
+                . "WHEN MATCHED THEN\n"
+                . "  UPDATE SET [age] = 25\n"
+                . "WHEN NOT MATCHED THEN\n"
+                . "  INSERT ([email], [age])\n"
+                . '  VALUES (source.[email], source.[age]);'
+        );
     }
 
     public function testIncrementMethod(): void
     {
         $qb = new QueryBuilder(QbConsts::DRIVER_MSSQL);
-        $driver = $qb->getDriverInstance();
-        $builder = MssqlMergeBuilder::create($qb, $driver);
+        $builder = $qb->conflictBuilder();
 
         $qb->insert('users')
             ->insertRow(['email' => 'test@example.com', 'views' => 10])
@@ -285,14 +342,23 @@ final class MergeBuilderTest extends TestCase
             ->build()
         ;
 
-        self::assertStringContainsString('[views] = [views] + 1', $sql);
+        Assert::same(
+            $sql,
+            "MERGE INTO [users] AS target\n"
+                . "USING (VALUES ('test@example.com', 10)) AS source ([email], [views])\n"
+                . "ON target.[email] = source.[email]\n"
+                . "WHEN MATCHED THEN\n"
+                . "  UPDATE SET [views] = target.[views] + 1\n"
+                . "WHEN NOT MATCHED THEN\n"
+                . "  INSERT ([email], [views])\n"
+                . '  VALUES (source.[email], source.[views]);'
+        );
     }
 
     public function testDecrementMethod(): void
     {
         $qb = new QueryBuilder(QbConsts::DRIVER_MSSQL);
-        $driver = $qb->getDriverInstance();
-        $builder = MssqlMergeBuilder::create($qb, $driver);
+        $builder = $qb->conflictBuilder();
 
         $qb->insert('users')
             ->insertRow(['email' => 'test@example.com', 'balance' => 100])
@@ -303,14 +369,23 @@ final class MergeBuilderTest extends TestCase
             ->build()
         ;
 
-        self::assertStringContainsString('[balance] = [balance] - 10', $sql);
+        Assert::same(
+            $sql,
+            "MERGE INTO [users] AS target\n"
+                . "USING (VALUES ('test@example.com', 100)) AS source ([email], [balance])\n"
+                . "ON target.[email] = source.[email]\n"
+                . "WHEN MATCHED THEN\n"
+                . "  UPDATE SET [balance] = target.[balance] - 10\n"
+                . "WHEN NOT MATCHED THEN\n"
+                . "  INSERT ([email], [balance])\n"
+                . '  VALUES (source.[email], source.[balance]);'
+        );
     }
 
     public function testSetNullMethod(): void
     {
         $qb = new QueryBuilder(QbConsts::DRIVER_MSSQL);
-        $driver = $qb->getDriverInstance();
-        $builder = MssqlMergeBuilder::create($qb, $driver);
+        $builder = $qb->conflictBuilder();
 
         $qb->insert('users')
             ->insertRow(['email' => 'test@example.com', 'name' => 'Test'])
@@ -321,14 +396,23 @@ final class MergeBuilderTest extends TestCase
             ->build()
         ;
 
-        self::assertStringContainsString('[name] = NULL', $sql);
+        Assert::same(
+            $sql,
+            "MERGE INTO [users] AS target\n"
+                . "USING (VALUES ('test@example.com', 'Test')) AS source ([email], [name])\n"
+                . "ON target.[email] = source.[email]\n"
+                . "WHEN MATCHED THEN\n"
+                . "  UPDATE SET [name] = NULL\n"
+                . "WHEN NOT MATCHED THEN\n"
+                . "  INSERT ([email], [name])\n"
+                . '  VALUES (source.[email], source.[name]);'
+        );
     }
 
     public function testSqlFunctionMethod(): void
     {
         $qb = new QueryBuilder(QbConsts::DRIVER_MSSQL);
-        $driver = $qb->getDriverInstance();
-        $builder = MssqlMergeBuilder::create($qb, $driver);
+        $builder = $qb->conflictBuilder();
 
         $qb->insert('users')
             ->insertRow(['email' => 'test@example.com', 'name' => 'Test'])
@@ -339,14 +423,23 @@ final class MergeBuilderTest extends TestCase
             ->build()
         ;
 
-        self::assertStringContainsString('[updated_at] = GETDATE()', $sql);
+        Assert::same(
+            $sql,
+            "MERGE INTO [users] AS target\n"
+                . "USING (VALUES ('test@example.com', 'Test')) AS source ([email], [name])\n"
+                . "ON target.[email] = source.[email]\n"
+                . "WHEN MATCHED THEN\n"
+                . "  UPDATE SET [updated_at] = GETDATE()\n"
+                . "WHEN NOT MATCHED THEN\n"
+                . "  INSERT ([email], [name])\n"
+                . '  VALUES (source.[email], source.[name]);'
+        );
     }
 
     public function testConflictTargetWithMultipleFields(): void
     {
         $qb = new QueryBuilder(QbConsts::DRIVER_MSSQL);
-        $driver = $qb->getDriverInstance();
-        $builder = MssqlMergeBuilder::create($qb, $driver);
+        $builder = $qb->conflictBuilder();
 
         $qb->insert('orders')
             ->insertRow(['user_id' => 1, 'product_id' => 2, 'quantity' => 5])
@@ -357,16 +450,23 @@ final class MergeBuilderTest extends TestCase
             ->build()
         ;
 
-        self::assertStringContainsString('target.[user_id] = source.[user_id]', $sql);
-        self::assertStringContainsString('target.[product_id] = source.[product_id]', $sql);
-        self::assertStringContainsString('AND', $sql);
+        Assert::same(
+            $sql,
+            "MERGE INTO [orders] AS target\n"
+                . "USING (VALUES (1, 2, 5)) AS source ([user_id], [product_id], [quantity])\n"
+                . "ON target.[user_id] = source.[user_id] AND target.[product_id] = source.[product_id]\n"
+                . "WHEN MATCHED THEN\n"
+                . "  UPDATE SET [quantity] = 10\n"
+                . "WHEN NOT MATCHED THEN\n"
+                . "  INSERT ([user_id], [product_id], [quantity])\n"
+                . '  VALUES (source.[user_id], source.[product_id], source.[quantity]);'
+        );
     }
 
     public function testMultipleUpdateOperations(): void
     {
         $qb = new QueryBuilder(QbConsts::DRIVER_MSSQL);
-        $driver = $qb->getDriverInstance();
-        $builder = MssqlMergeBuilder::create($qb, $driver);
+        $builder = $qb->conflictBuilder();
 
         $qb->insert('users')
             ->insertRow(['email' => 'test@example.com', 'name' => 'Test', 'views' => 0])
@@ -379,41 +479,23 @@ final class MergeBuilderTest extends TestCase
             ->build()
         ;
 
-        self::assertStringContainsString('[name] = \'Updated\'', $sql);
-        self::assertStringContainsString('[views] = [views] + 1', $sql);
-        self::assertStringContainsString('[updated_at] = GETDATE()', $sql);
-    }
-
-    public function testExcludedMethodFromAbstractMergeBuilder(): void
-    {
-        $qb = new QueryBuilder(QbConsts::DRIVER_MSSQL);
-        $driver = $qb->getDriverInstance();
-        $builder = MssqlMergeBuilder::create($qb, $driver);
-
-        $qb->insert('users')
-            ->insertRow(['email' => 'test@example.com', 'name' => 'Test', 'age' => 30])
-        ;
-
-        $builder->conflictTarget(['email'])
-            ->excluded('name')
-            ->excluded('age', 'age')
-        ;
-
-        $reflection = new \ReflectionClass($builder);
-        $method = $reflection->getMethod('excluded');
-        self::assertTrue($method->isPublic());
-        self::assertSame('QBuilder\Builder\AbstractMergeBuilder', $method->getDeclaringClass()->getName());
-
-        $sql = $builder->build();
-        self::assertStringContainsString('source.[name]', $sql);
-        self::assertStringContainsString('source.[age]', $sql);
+        Assert::same(
+            $sql,
+            "MERGE INTO [users] AS target\n"
+                . "USING (VALUES ('test@example.com', 'Test', 0)) AS source ([email], [name], [views])\n"
+                . "ON target.[email] = source.[email]\n"
+                . "WHEN MATCHED THEN\n"
+                . "  UPDATE SET [name] = 'Updated', [views] = target.[views] + 1, [updated_at] = GETDATE()\n"
+                . "WHEN NOT MATCHED THEN\n"
+                . "  INSERT ([email], [name], [views])\n"
+                . '  VALUES (source.[email], source.[name], source.[views]);'
+        );
     }
 
     public function testExpressionMethodInMergeBuilder(): void
     {
         $qb = new QueryBuilder(QbConsts::DRIVER_MSSQL);
-        $driver = $qb->getDriverInstance();
-        $builder = MssqlMergeBuilder::create($qb, $driver);
+        $builder = $qb->conflictBuilder();
 
         $qb->insert('products')
             ->insertRow(['id' => 1, 'price' => 100, 'discount' => 10])
@@ -424,14 +506,23 @@ final class MergeBuilderTest extends TestCase
             ->build()
         ;
 
-        self::assertStringContainsString('[price] = price * 1.1', $sql);
+        Assert::same(
+            $sql,
+            "MERGE INTO [products] AS target\n"
+                . "USING (VALUES (1, 100, 10)) AS source ([id], [price], [discount])\n"
+                . "ON target.[id] = source.[id]\n"
+                . "WHEN MATCHED THEN\n"
+                . "  UPDATE SET [price] = price * 1.1\n"
+                . "WHEN NOT MATCHED THEN\n"
+                . "  INSERT ([id], [price], [discount])\n"
+                . '  VALUES (source.[id], source.[price], source.[discount]);'
+        );
     }
 
     public function testCaseExpressionMethodInMergeBuilder(): void
     {
         $qb = new QueryBuilder(QbConsts::DRIVER_MSSQL);
-        $driver = $qb->getDriverInstance();
-        $builder = MssqlMergeBuilder::create($qb, $driver);
+        $builder = $qb->conflictBuilder();
 
         $qb->insert('users')
             ->insertRow(['email' => 'test@example.com', 'status' => 'pending', 'count' => 5])
@@ -445,17 +536,24 @@ final class MergeBuilderTest extends TestCase
             ->build()
         ;
 
-        self::assertStringContainsString('CASE', $sql);
-        self::assertStringContainsString('WHEN count > 10 THEN \'active\'', $sql);
-        self::assertStringContainsString('ELSE \'pending\'', $sql);
-        self::assertStringContainsString('END', $sql);
+        Assert::same(
+            $sql,
+            "MERGE INTO [users] AS target\n"
+                . 'USING (VALUES (\'test@example.com\', \'pending\', 5)) AS source ([email], [status], '
+                . "[count])\n"
+                . "ON target.[email] = source.[email]\n"
+                . "WHEN MATCHED THEN\n"
+                . "  UPDATE SET [status] = CASE WHEN count > 10 THEN 'active' ELSE 'pending' END\n"
+                . "WHEN NOT MATCHED THEN\n"
+                . "  INSERT ([email], [status], [count])\n"
+                . '  VALUES (source.[email], source.[status], source.[count]);'
+        );
     }
 
     public function testExpressionMethodInOracleMergeBuilder(): void
     {
         $qb = new QueryBuilder(QbConsts::DRIVER_ORACLE);
-        $driver = $qb->getDriverInstance();
-        $builder = OracleMergeBuilder::create($qb, $driver);
+        $builder = $qb->conflictBuilder();
 
         $qb->insert('products')
             ->insertRow(['id' => 1, 'price' => 100])
@@ -466,14 +564,23 @@ final class MergeBuilderTest extends TestCase
             ->build()
         ;
 
-        self::assertStringContainsString('"PRICE" = price * 1.1', $sql);
+        Assert::same(
+            $sql,
+            "MERGE INTO \"PRODUCTS\" target\n"
+                . 'USING (SELECT 1 AS "ID", 100 AS "PRICE" FROM DUAL) source ON (target."ID" = '
+                . "source.\"ID\")\n"
+                . "WHEN MATCHED THEN\n"
+                . "  UPDATE SET \"PRICE\" = price * 1.1\n"
+                . "WHEN NOT MATCHED THEN\n"
+                . "  INSERT (\"ID\", \"PRICE\")\n"
+                . '  VALUES (source."ID", source."PRICE")'
+        );
     }
 
     public function testCaseExpressionMethodInOracleMergeBuilder(): void
     {
         $qb = new QueryBuilder(QbConsts::DRIVER_ORACLE);
-        $driver = $qb->getDriverInstance();
-        $builder = OracleMergeBuilder::create($qb, $driver);
+        $builder = $qb->conflictBuilder();
 
         $qb->insert('users')
             ->insertRow(['email' => 'test@example.com', 'status' => 'pending'])
@@ -487,8 +594,16 @@ final class MergeBuilderTest extends TestCase
             ->build()
         ;
 
-        self::assertStringContainsString('CASE', $sql);
-        self::assertStringContainsString('WHEN count > 10 THEN \'active\'', $sql);
-        self::assertStringContainsString('ELSE \'pending\'', $sql);
+        Assert::same(
+            $sql,
+            "MERGE INTO \"USERS\" target\n"
+                . 'USING (SELECT \'test@example.com\' AS "EMAIL", \'pending\' AS "STATUS" FROM DUAL) source ON '
+                . "(target.\"EMAIL\" = source.\"EMAIL\")\n"
+                . "WHEN MATCHED THEN\n"
+                . "  UPDATE SET \"STATUS\" = CASE WHEN count > 10 THEN 'active' ELSE 'pending' END\n"
+                . "WHEN NOT MATCHED THEN\n"
+                . "  INSERT (\"EMAIL\", \"STATUS\")\n"
+                . '  VALUES (source."EMAIL", source."STATUS")'
+        );
     }
 }

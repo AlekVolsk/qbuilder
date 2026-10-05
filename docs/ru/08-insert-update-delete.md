@@ -2,6 +2,8 @@
 
 ## INSERT запросы
 
+INSERT требует хотя бы одно поле (`insertRow()` с данными или `insertFrom()`), UPDATE — хотя бы одно присваивание (`updateRow()`); иначе `build()` бросает `MissingRequirementException`, а не собирает неполный запрос.
+
 ### Вставка одной записи
 
 ```php
@@ -48,9 +50,14 @@ $qb->insert('users')
 // ON DUPLICATE KEY UPDATE `name` = 'John Updated', `visits` = `visits` + 1
 ```
 
+Обработчик конфликта собирается в момент передачи в `insertConflictHandler()`, поэтому сначала вызывайте `insertRow()`: MS SQL Server и Oracle строят `MERGE` из уже добавленных строк и бросают `MissingRequirementException` без строк или без `conflictTarget()`; PostgreSQL ссылается на таблицу INSERT в `increment()` / `decrement()`.
+
 **Ссылка на вставляемое значение — `excluded()`.** Синтаксис зависит от сервера: в MySQL 8.0.20+ функция `VALUES(col)` объявлена устаревшей (предупреждение 1287), её замена — алиас строки `AS new` (MySQL 8.0.19+), которого нет в MariaDB. Билдер соединения не открывает, поэтому версию сервера передаёт вызывающий код:
 
 ```php
+use QBuilder\QbConsts;
+use QBuilder\QueryBuilder;
+
 $qb = new QueryBuilder(QbConsts::DRIVER_PDO_MYSQL);
 $qb->setServerVersion($pdo->getAttribute(PDO::ATTR_SERVER_VERSION));
 

@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace QBuilder\Tests;
 
-use PHPUnit\Framework\Attributes\DataProvider;
-use PHPUnit\Framework\TestCase;
 use QBuilder\Condition\ConditionBy;
 use QBuilder\Condition\ConditionJoin;
 use QBuilder\Condition\Field;
@@ -13,20 +11,23 @@ use QBuilder\Drivers\Pgsql\PgsqlDriver;
 use QBuilder\Exceptions\MissingRequirementException;
 use QBuilder\QbConsts;
 use QBuilder\QueryBuilder;
+use Testo\Assert;
+use Testo\Data\DataProvider;
+use Testo\Expect;
+use Testo\Test;
 
 /**
  * @internal
- *
- * @coversNothing
  */
-final class PgsqlDriverTest extends TestCase
+#[Test]
+final class PgsqlDriverTest
 {
     public function testPgsqlQuoting(): void
     {
         $qb = $this->getQueryBuilder();
         $sql = $qb->select('id', 'name')->from('users')->build(true);
 
-        self::assertSame('SELECT "id", "name" FROM "users"', $sql);
+        Assert::same($sql, 'SELECT "id", "name" FROM "users"');
     }
 
     public function testPgsqlOnConflict(): void
@@ -44,23 +45,24 @@ final class PgsqlDriverTest extends TestCase
         ;
 
         $expected = 'INSERT INTO "users" ("email", "name") '
-            .'VALUES (\'test@example.com\', \'John\') '
-            .'ON CONFLICT ("email") DO UPDATE SET '
-            .'"name" = \'John Updated\', "updated_at" = NOW()';
+            . 'VALUES (\'test@example.com\', \'John\') '
+            . 'ON CONFLICT ("email") DO UPDATE SET '
+            . '"name" = \'John Updated\', "updated_at" = NOW()';
 
-        self::assertSame($expected, $sql);
+        Assert::same($sql, $expected);
     }
 
     public function testPgsqlOnConflictDoNothing(): void
     {
         $qb = $this->getQueryBuilder();
 
-        $this->expectException(MissingRequirementException::class);
-        $this->expectExceptionMessage('Conflict target must be specified for PostgreSQL ON CONFLICT');
+        Expect::exception(MissingRequirementException::class)
+            ->withMessageContaining('Conflict target must be specified for PostgreSQL ON CONFLICT')
+        ;
 
         $conflictBuilder = $qb->conflictBuilder();
 
-        $sql = $qb->insert('users')->insertRow(['email' => 'test@example.com', 'name' => 'John'])
+        $qb->insert('users')->insertRow(['email' => 'test@example.com', 'name' => 'John'])
             ->insertConflictHandler($conflictBuilder)
             ->build(true)
         ;
@@ -81,10 +83,10 @@ final class PgsqlDriverTest extends TestCase
         ;
 
         $expected = 'INSERT INTO "users" ("id", "name", "counter") VALUES (1, \'John\', 1) '
-            .'ON CONFLICT ("id") DO UPDATE SET '
-            .'"name" = EXCLUDED."name", "counter" = EXCLUDED."counter"';
+            . 'ON CONFLICT ("id") DO UPDATE SET '
+            . '"name" = EXCLUDED."name", "counter" = EXCLUDED."counter"';
 
-        self::assertSame($expected, $sql);
+        Assert::same($sql, $expected);
     }
 
     public function testPgsqlOnConflictIncrement(): void
@@ -101,9 +103,21 @@ final class PgsqlDriverTest extends TestCase
         ;
 
         $expected = 'INSERT INTO "users" ("id", "views") VALUES (1, 1) '
-            .'ON CONFLICT ("id") DO UPDATE SET "views" = "views" + 1';
+            . 'ON CONFLICT ("id") DO UPDATE SET "views" = "users"."views" + 1';
 
-        self::assertSame($expected, $sql);
+        Assert::same($sql, $expected);
+    }
+
+    public function testPgsqlOnConflictIncrementNeedsInsertTable(): void
+    {
+        $conflictBuilder = $this->getQueryBuilder()->conflictBuilder()
+            ->conflictTarget(['id'])
+            ->decrement('stock')
+        ;
+
+        Expect::exception(MissingRequirementException::class)->withMessageContaining('needs the INSERT table');
+
+        $conflictBuilder->build();
     }
 
     public function testPgsqlOnConflictSetEscapesUserInput(): void
@@ -121,7 +135,7 @@ final class PgsqlDriverTest extends TestCase
             ->build(true)
         ;
 
-        self::assertTrue(str_contains($sql, "'''; DROP TABLE users; --'"));
+        Assert::true(str_contains($sql, "'''; DROP TABLE users; --'"));
 
         $functionLike = 'some_value()';
         $conflictBuilder2 = $qb->conflictBuilder()
@@ -134,7 +148,7 @@ final class PgsqlDriverTest extends TestCase
             ->build(true)
         ;
 
-        self::assertTrue(str_contains($sql2, "'some_value()'"));
+        Assert::true(str_contains($sql2, "'some_value()'"));
     }
 
     public function testPgsqlLimit(): void
@@ -142,7 +156,7 @@ final class PgsqlDriverTest extends TestCase
         $qb = $this->getQueryBuilder();
         $sql = $qb->select('*')->from('users')->limit(10)->build(true);
 
-        self::assertSame('SELECT * FROM "users" LIMIT 10', $sql);
+        Assert::same($sql, 'SELECT * FROM "users" LIMIT 10');
     }
 
     public function testPgsqlLimitOffset(): void
@@ -150,7 +164,7 @@ final class PgsqlDriverTest extends TestCase
         $qb = $this->getQueryBuilder();
         $sql = $qb->select('*')->from('users')->limit(10, 20)->build(true);
 
-        self::assertSame('SELECT * FROM "users" LIMIT 10 OFFSET 20', $sql);
+        Assert::same($sql, 'SELECT * FROM "users" LIMIT 10 OFFSET 20');
     }
 
     public function testPgsqlLimitWithTies(): void
@@ -163,11 +177,8 @@ final class PgsqlDriverTest extends TestCase
             ->build(true)
         ;
 
-        self::assertSame(
-            'SELECT "name", "salary" FROM "employees" '
-            .'ORDER BY "salary" DESC FETCH FIRST 5 ROWS WITH TIES',
-            $sql
-        );
+        Assert::same($sql, 'SELECT "name", "salary" FROM "employees" '
+        . 'ORDER BY "salary" DESC FETCH FIRST 5 ROWS WITH TIES');
     }
 
     public function testPgsqlProcedureNoParams(): void
@@ -175,7 +186,7 @@ final class PgsqlDriverTest extends TestCase
         $qb = $this->getQueryBuilder();
         $sql = $qb->procedure('get_all_users')->build(true);
 
-        self::assertSame('CALL "get_all_users"()', $sql);
+        Assert::same($sql, 'CALL "get_all_users"()');
     }
 
     public function testPgsqlProcedureWithParams(): void
@@ -183,7 +194,7 @@ final class PgsqlDriverTest extends TestCase
         $qb = $this->getQueryBuilder();
         $sql = $qb->procedure('get_user_by_id', [1, 'active'])->build(true);
 
-        self::assertSame("CALL \"get_user_by_id\"(1, 'active')", $sql);
+        Assert::same($sql, "CALL \"get_user_by_id\"(1, 'active')");
     }
 
     public function testPgsqlInsertMultipleRows(): void
@@ -197,7 +208,7 @@ final class PgsqlDriverTest extends TestCase
 
         $expected = 'INSERT INTO "users" ("name", "age") VALUES (\'John\', 30), (\'Jane\', 25)';
 
-        self::assertSame($expected, $sql);
+        Assert::same($sql, $expected);
     }
 
     /**
@@ -206,7 +217,7 @@ final class PgsqlDriverTest extends TestCase
     #[DataProvider('providePgsqlQuoteValueCases')]
     public function testPgsqlQuoteValue(string $value, string $expected): void
     {
-        self::assertSame($expected, (new PgsqlDriver())->quoteValue($value));
+        Assert::same((new PgsqlDriver())->quoteValue($value), $expected);
     }
 
     /**
@@ -232,7 +243,7 @@ final class PgsqlDriverTest extends TestCase
             ->build(true)
         ;
 
-        self::assertSame('SELECT * FROM "users" WHERE ("name" LIKE \'50!%%\' ESCAPE \'!\')', $sql);
+        Assert::same($sql, 'SELECT * FROM "users" WHERE ("name" LIKE \'50!%%\' ESCAPE \'!\')');
     }
 
     public function testPgsqlComplexJoin(): void
@@ -258,13 +269,13 @@ final class PgsqlDriverTest extends TestCase
         ;
 
         $expected = 'SELECT "u"."id", "u"."name", "o"."total" '
-            .'FROM "users" AS "u" '
-            .'INNER JOIN "orders" AS "o" ON ("o"."user_id" = "u"."id") '
-            .'WHERE ("o"."total" >= 100) '
-            .'ORDER BY "o"."total" DESC '
-            .'LIMIT 10';
+            . 'FROM "users" AS "u" '
+            . 'INNER JOIN "orders" AS "o" ON ("o"."user_id" = "u"."id") '
+            . 'WHERE ("o"."total" >= 100) '
+            . 'ORDER BY "o"."total" DESC '
+            . 'LIMIT 10';
 
-        self::assertSame($expected, $sql);
+        Assert::same($sql, $expected);
     }
 
     public function testPgsqlSubqueryInWhere(): void
@@ -284,9 +295,9 @@ final class PgsqlDriverTest extends TestCase
         ;
 
         $expected = 'SELECT * FROM "users" WHERE ("id" IN '
-            .'(SELECT "user_id" FROM "orders" WHERE ("total" >= 1000)))';
+            . '(SELECT "user_id" FROM "orders" WHERE ("total" >= 1000)))';
 
-        self::assertSame($expected, $sql);
+        Assert::same($sql, $expected);
     }
 
     public function testPgsqlCteSimple(): void
@@ -294,7 +305,7 @@ final class PgsqlDriverTest extends TestCase
         $qb = $this->getQueryBuilder();
         $sql = $qb->select('id', 'name')->from('users')->build(true);
 
-        self::assertSame('SELECT "id", "name" FROM "users"', $sql);
+        Assert::same($sql, 'SELECT "id", "name" FROM "users"');
     }
 
     public function testPgsqlDistinct(): void
@@ -302,7 +313,7 @@ final class PgsqlDriverTest extends TestCase
         $qb = $this->getQueryBuilder();
         $sql = $qb->select('user_id')->distinct()->from('orders')->build(true);
 
-        self::assertSame('SELECT DISTINCT "user_id" FROM "orders"', $sql);
+        Assert::same($sql, 'SELECT DISTINCT "user_id" FROM "orders"');
     }
 
     public function testPgsqlDistinctMultipleFields(): void
@@ -310,7 +321,7 @@ final class PgsqlDriverTest extends TestCase
         $qb = $this->getQueryBuilder();
         $sql = $qb->select('user_id', 'status')->distinct()->from('orders')->build(true);
 
-        self::assertSame('SELECT DISTINCT "user_id", "status" FROM "orders"', $sql);
+        Assert::same($sql, 'SELECT DISTINCT "user_id", "status" FROM "orders"');
     }
 
     public function testPgsqlDistinctWithWhere(): void
@@ -321,7 +332,7 @@ final class PgsqlDriverTest extends TestCase
             ->build(true)
         ;
 
-        self::assertSame('SELECT DISTINCT "user_id" FROM "orders" WHERE ("status" = \'completed\')', $sql);
+        Assert::same($sql, 'SELECT DISTINCT "user_id" FROM "orders" WHERE ("status" = \'completed\')');
     }
 
     public function testPgsqlDistinctWithOrderBy(): void
@@ -333,7 +344,7 @@ final class PgsqlDriverTest extends TestCase
             ->build(true)
         ;
 
-        self::assertSame('SELECT DISTINCT "category" FROM "products" ORDER BY "category" ASC', $sql);
+        Assert::same($sql, 'SELECT DISTINCT "category" FROM "products" ORDER BY "category" ASC');
     }
 
     public function testPgsqlIgnoresFinalModifier(): void
@@ -341,7 +352,7 @@ final class PgsqlDriverTest extends TestCase
         $qb = $this->getQueryBuilder();
         $sql = $qb->select()->from('users')->final()->build(true);
 
-        self::assertSame('SELECT * FROM "users"', $sql);
+        Assert::same($sql, 'SELECT * FROM "users"');
     }
 
     private function getQueryBuilder(): QueryBuilder

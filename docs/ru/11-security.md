@@ -35,6 +35,10 @@ $qb->select('*')
 
 `INF` и `NAN` не имеют SQL-литерала — `formatValue()` бросает `InvalidQueryException`.
 
+**`bool` форматируется по типу PHP, а не по типу колонки.** PostgreSQL получает `TRUE` / `FALSE`, что подходит только колонке `boolean`: колонка-флаг типа `integer` его отвергнет (`column "flag" is of type integer but expression is of type boolean`). Для целочисленных флагов передавайте `1` / `0` как `int`. MySQL и SQLite в обоих случаях сохраняют `1` / `0`.
+
+**NUL-байт.** PostgreSQL и SQLite не принимают NUL-байт (`"\0"`) в тексте SQL — запрос на нём обрывается, — поэтому строка с NUL на этих драйверах бросает `InvalidQueryException`. MySQL сохраняет её как есть.
+
 ```php
 $qb->insert('org')
     ->insertRow(['inn' => '0123456789', 'qty' => 5, 'active' => false])
@@ -62,6 +66,24 @@ $qb->where()
 ```php
 $userInput = $_GET['status'];
 $sql = "SELECT * FROM users WHERE status = '" . $userInput . "'";
+```
+
+## SQL-фрагменты в обработчиках конфликтов
+
+`increment()` и `decrement()` принимают только числа: нечисловая строка, `INF` или `NAN` бросают `InvalidQueryException`.
+
+`expression()`, `caseExpression()` и `sqlFunction()` вставляют SQL как есть — передавайте в них SQL, написанный в коде, а не пользовательский ввод; для пользовательских значений есть `set()`. При этом каждый фрагмент обязан оставаться одним выражением в правой части своего присваивания, иначе бросается `InvalidIdentifierException`:
+
+- строковые литералы (`'...'`, `"..."`) и идентификаторы в кавычках драйвера допустимы, удвоенная кавычка внутри них — экранирование;
+- обратный слэш, управляющие символы, прочие кавычки, `$`, `@`, `{`, `}`, `#`, `;`, `--`, `/* */` запрещены;
+- скобки должны быть сбалансированы, запятая допустима только внутри скобок;
+- `SELECT`, `UNION`, `INSERT`, `UPDATE`, `DELETE`, `DROP`, `MERGE`, `EXEC`, `EXECUTE`, `CALL`, `INTO`, `WHERE`, `RETURNING`, `OUTPUT`, `CASE`, `END` вне литералов запрещены; `WHEN`, `THEN`, `ELSE` допустимы только в условиях `caseExpression()`. Колонку с таким именем берите в кавычки.
+
+```php
+$cb->sqlFunction('label', "CONCAT(first_name, ', ', last_name)"); // ✅ OK
+$cb->sqlFunction('note', 'NOW(), role = 1');                       // ❌ запятая вне скобок
+$cb->expression('note', '(SELECT password FROM users LIMIT 1)');   // ❌ SELECT
+$cb->increment('visits', '1; DROP TABLE users');                   // ❌ не число
 ```
 
 ## Валидация идентификаторов

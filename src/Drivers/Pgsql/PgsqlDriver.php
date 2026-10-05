@@ -7,14 +7,17 @@ namespace QBuilder\Drivers\Pgsql;
 use QBuilder\Builder\ConflictBuilderInterface;
 use QBuilder\Drivers\AbstractDriver;
 use QBuilder\Drivers\SqlBuilderInterface;
+use QBuilder\Exceptions\InvalidQueryException;
 use QBuilder\QueryBuilder;
 
 /**
  * PostgreSQL driver for QueryBuilder.
  *
  * Implements specific SQL query building logic for PostgreSQL.
+ *
+ * @internal
  */
-class PgsqlDriver extends AbstractDriver
+final class PgsqlDriver extends AbstractDriver
 {
     public function getSqlBuilder(QueryBuilder $queryBuilder): SqlBuilderInterface
     {
@@ -36,8 +39,15 @@ class PgsqlDriver extends AbstractDriver
         return "'";
     }
 
+    /**
+     * @throws InvalidQueryException If the value contains a NUL byte: the SQL text ends at it
+     */
     public function escapeValue(string $value): string
     {
+        if (str_contains($value, "\0")) {
+            throw new InvalidQueryException('PostgreSQL string value must not contain NUL bytes');
+        }
+
         return str_replace(
             ['\\', "'"],
             ['\\\\', "''"],
@@ -60,27 +70,22 @@ class PgsqlDriver extends AbstractDriver
     {
         $quoted = parent::quoteValue($value);
 
-        return str_contains($value, '\\') ? 'E'.$quoted : $quoted;
+        return str_contains($value, '\\') ? 'E' . $quoted : $quoted;
     }
 
     public function getLimitSql(int $limit, ?int $offset = null, bool $withTies = false): string
     {
         if ($withTies) {
-            return "\nFETCH FIRST ".$limit.' ROWS WITH TIES';
+            return "\nFETCH FIRST " . $limit . ' ROWS WITH TIES';
         }
 
-        $sql = "\nLIMIT ".$limit;
+        $sql = "\nLIMIT " . $limit;
 
         if (null !== $offset && $offset > 0) {
-            $sql .= "\nOFFSET ".$offset;
+            $sql .= "\nOFFSET " . $offset;
         }
 
         return $sql;
-    }
-
-    public function getName(): string
-    {
-        return 'pgsql';
     }
 
     /**
